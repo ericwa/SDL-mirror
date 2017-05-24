@@ -794,6 +794,12 @@ WIN_GL_MakeCurrent(_THIS, SDL_Window * window, SDL_GLContext context)
     return 0;
 }
 
+void
+WIN_GL_GetDrawableSize(_THIS, SDL_Window *window, int *w, int *h)
+{
+    WIN_GetDrawableSize(window, w, h);
+}
+
 int
 WIN_GL_SetSwapInterval(_THIS, int interval)
 {

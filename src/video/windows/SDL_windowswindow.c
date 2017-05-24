@@ -84,9 +84,7 @@ WIN_SetWindowPositionInternal(_THIS, SDL_Window * window, UINT flags)
     SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
     HWND hwnd = data->hwnd;
     RECT rect;
-    DWORD style;
     HWND top;
-    BOOL menu;
     int x, y;
     int w, h;
 
@@ -96,21 +94,105 @@ WIN_SetWindowPositionInternal(_THIS, SDL_Window * window, UINT flags)
     } else {
         top = HWND_NOTOPMOST;
     }
-    style = GetWindowLong(hwnd, GWL_STYLE);
-    rect.left = 0;
-    rect.top = 0;
-    rect.right = window->w;
-    rect.bottom = window->h;
-    menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(hwnd) != NULL);
-    AdjustWindowRectEx(&rect, style, menu, 0);
-    w = (rect.right - rect.left);
-    h = (rect.bottom - rect.top);
-    x = window->x + rect.left;
-    y = window->y + rect.top;
+
+    /* The SetWindowPos we are going to do might move the window to a new monitor
+       with a different DPI.
+
+       Calculate the new "physical" screen space position from SDL "virtual" screen coordinates
+       without using any information about the current state of the window;
+       this is a best-effort conversion, because depending on the size of the
+       window and what monitors it touches, we can't tell exactly what
+       monitor Windows will decide it belongs to.
+    
+       Calculate the new width/height in pixels assuming the destination monitor
+       will have the same DPI as the current one. If it doesn't, the WM_DPICHANGED 
+       will correct the size in pixels.
+    */
+    x = window->x;
+    y = window->y;
+    WIN_VirtualToPhysical_ScreenPoint(&x, &y, window->w, window->h);
+
+    w = data->window->w;
+    h = data->window->h;
+    WIN_VirtualToPhysical_ClientPoint(data->window, &w, &h);
+
+    rect.left = x;
+    rect.top = y;
+    rect.right = x + w;
+    rect.bottom = y + h;
+    WIN_AdjustRect(window, &rect);
 
     data->expected_resize = SDL_TRUE;
-    SetWindowPos(hwnd, top, x, y, w, h, flags);
+    SetWindowPos(hwnd, top, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, flags);
     data->expected_resize = SDL_FALSE;
+}
+
+static UINT
+WIN_DPIForHWND(const SDL_VideoData *videodata, HWND hwnd)
+{
+    if (!videodata->highdpi_enabled)
+        return 96;
+
+    // window 10+
+    if (videodata->GetDpiForWindow) { 
+        return videodata->GetDpiForWindow(hwnd);
+    }
+
+    // window 8.1+
+    if (videodata->GetDpiForMonitor) {
+        HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        if (monitor) {
+            UINT xdpi, ydpi;
+            if (S_OK == videodata->GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &xdpi, &ydpi)) {
+                return xdpi;
+            }
+        }
+    }
+
+    // windows 8.0 and below
+    {
+        HDC hdc = GetDC(NULL);
+        if (hdc) {
+            UINT dpi = GetDeviceCaps(hdc, LOGPIXELSX);
+            ReleaseDC(NULL, hdc);
+            return dpi;
+        }
+    }
+
+    return 96;
+}
+
+static void
+WIN_AdjustRectForStyle(const SDL_Window * window, DWORD style, LPRECT rect)
+{
+    const SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
+    HWND hwnd = data->hwnd;
+    BOOL menu;
+
+    /* DJM - according to the docs for GetMenu(), the
+    return value is undefined if hwnd is a child window.
+    Apparently it's too difficult for MS to check
+    inside their function, so I have to do it here.
+    */
+    menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(hwnd) != NULL);
+    if (data->videodata->highdpi_enabled && data->videodata->AdjustWindowRectExForDpi) {
+        data->videodata->AdjustWindowRectExForDpi(rect, style, menu, 0, data->scaling_dpi);
+    } else {
+        AdjustWindowRectEx(rect, style, menu, 0);
+    }
+}
+
+void 
+WIN_AdjustRect(const SDL_Window * window, LPRECT rect)
+{
+    const SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
+    HWND hwnd = data->hwnd;
+    DWORD style;
+
+    /* Figure out what the window area will be */
+    style = GetWindowLong(hwnd, GWL_STYLE);
+
+    WIN_AdjustRectForStyle(window, style, rect);
 }
 
 static int
@@ -132,6 +214,7 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, SDL_bool created)
     data->mouse_button_flags = 0;
     data->videodata = videodata;
     data->initializing = SDL_TRUE;
+    data->scaling_dpi = WIN_DPIForHWND(videodata, hwnd);
 
     window->driverdata = data;
 
@@ -159,34 +242,37 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, SDL_bool created)
     }
 #endif
 
+    /* Move window to the correct monitor and size it */
+    WIN_SetWindowPositionInternal(_this, window, SWP_NOCOPYBITS | SWP_NOACTIVATE);
+
     /* Fill in the SDL window with the window data */
     {
         RECT rect;
         if (GetClientRect(hwnd, &rect)) {
             int w = rect.right;
             int h = rect.bottom;
+            WIN_PhysicalToVirtual_ClientPoint(window, &w, &h);
             if ((window->w && window->w != w) || (window->h && window->h != h)) {
                 /* We tried to create a window larger than the desktop and Windows didn't allow it.  Override! */
                 RECT rect;
-                DWORD style;
-                BOOL menu;
                 int x, y;
-                int w, h;
 
                 /* Figure out what the window area will be */
-                style = GetWindowLong(hwnd, GWL_STYLE);
-                rect.left = 0;
-                rect.top = 0;
-                rect.right = window->w;
-                rect.bottom = window->h;
-                menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(hwnd) != NULL);
-                AdjustWindowRectEx(&rect, style, menu, 0);
-                w = (rect.right - rect.left);
-                h = (rect.bottom - rect.top);
-                x = window->x + rect.left;
-                y = window->y + rect.top;
+                x = window->x;
+                y = window->y;
+                WIN_VirtualToPhysical_ScreenPoint(&x, &y, window->w, window->h);
 
-                SetWindowPos(hwnd, HWND_NOTOPMOST, x, y, w, h, SWP_NOCOPYBITS | SWP_NOZORDER | SWP_NOACTIVATE);
+                w = window->w;
+                h = window->h;
+                WIN_VirtualToPhysical_ClientPoint(window, &w, &h);
+                
+                rect.left = x;
+                rect.top = y;
+                rect.right = x + w;
+                rect.bottom = y + h;
+                WIN_AdjustRect(window, &rect);
+
+                SetWindowPos(hwnd, HWND_NOTOPMOST, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOCOPYBITS | SWP_NOZORDER | SWP_NOACTIVATE);
             } else {
                 window->w = w;
                 window->h = h;
@@ -198,8 +284,11 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, SDL_bool created)
         point.x = 0;
         point.y = 0;
         if (ClientToScreen(hwnd, &point)) {
-            window->x = point.x;
-            window->y = point.y;
+            int x = point.x;
+            int y = point.y;
+            WIN_PhysicalToVirtual_ScreenPoint(&x, &y, window->w, window->h);
+            window->x = x;
+            window->y = y;
         }
     }
     {
@@ -263,32 +352,19 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, SDL_bool created)
     return 0;
 }
 
-
-
 int
 WIN_CreateWindow(_THIS, SDL_Window * window)
 {
     HWND hwnd;
-    RECT rect;
     DWORD style = STYLE_BASIC;
-    int x, y;
-    int w, h;
 
     style |= GetWindowStyle(window);
 
-    /* Figure out what the window area will be */
-    rect.left = window->x;
-    rect.top = window->y;
-    rect.right = window->x + window->w;
-    rect.bottom = window->y + window->h;
-    AdjustWindowRectEx(&rect, style, FALSE, 0);
-    x = rect.left;
-    y = rect.top;
-    w = (rect.right - rect.left);
-    h = (rect.bottom - rect.top);
-
+    /* For high-DPI support, it's easier / more robust to create the window
+       with a width/height of 0, then in SetupWindowData we will check the
+       DPI and adjust the position and size to match window->x,y,w,h */
     hwnd =
-        CreateWindow(SDL_Appname, TEXT(""), style, x, y, w, h, NULL, NULL,
+        CreateWindow(SDL_Appname, TEXT(""), style, CW_USEDEFAULT, 0, 0, 0, NULL, NULL,
                      SDL_Instance, NULL);
     if (!hwnd) {
         return WIN_SetError("Couldn't create window");
@@ -556,7 +632,6 @@ WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, 
     SDL_Rect bounds;
     DWORD style;
     HWND top;
-    BOOL menu;
     int x, y;
     int w, h;
 
@@ -573,10 +648,18 @@ WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, 
     WIN_GetDisplayBounds(_this, display, &bounds);
 
     if (fullscreen) {
+		float xdpi, ydpi;
+
         x = bounds.x;
         y = bounds.y;
         w = bounds.w;
         h = bounds.h;
+
+		// convert from scaled to unscaled
+		if (0 == WIN_GetDisplayDPI(_this, display, NULL, &xdpi, &ydpi)) {
+			w = MulDiv(w, (int)xdpi, 96);
+			h = MulDiv(h, (int)ydpi, 96);
+		}
 
         /* Unset the maximized flag.  This fixes
            https://bugzilla.libsdl.org/show_bug.cgi?id=3215
@@ -596,16 +679,24 @@ WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, 
             style |= WS_MAXIMIZE;
             data->windowed_mode_was_maximized = SDL_FALSE;
         }
-        rect.left = 0;
-        rect.top = 0;
-        rect.right = window->windowed.w;
-        rect.bottom = window->windowed.h;
-        menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(hwnd) != NULL);
-        AdjustWindowRectEx(&rect, style, menu, 0);
+        w = window->windowed.w;
+        h = window->windowed.h;
+        WIN_VirtualToPhysical_ClientPoint(window, &w, &h);
+
+        x = window->windowed.x;
+        y = window->windowed.y;
+        WIN_VirtualToPhysical_ScreenPoint(&x, &y, window->windowed.w, window->windowed.h);
+
+        rect.left = x;
+        rect.top = y;
+        rect.right = x + w;
+        rect.bottom = y + h;
+        WIN_AdjustRectForStyle(window, style, &rect);
+
+        x = rect.left;
+        y = rect.top;
         w = (rect.right - rect.left);
         h = (rect.bottom - rect.top);
-        x = window->windowed.x + rect.left;
-        y = window->windowed.y + rect.top;
     }
     SetWindowLong(hwnd, GWL_STYLE, style);
     data->expected_resize = SDL_TRUE;
@@ -892,6 +983,156 @@ WIN_SetWindowOpacity(_THIS, SDL_Window * window, float opacity)
     }
 
     return 0;
+}
+
+void
+WIN_GetDrawableSize(const SDL_Window *window, int *w, int *h)
+{
+    const SDL_WindowData *data = ((SDL_WindowData *)window->driverdata);
+
+    *w = MulDiv(window->w, data->scaling_dpi, 96);
+    *h = MulDiv(window->h, data->scaling_dpi, 96);
+}
+
+void
+WIN_PhysicalToVirtual_ClientPoint(const SDL_Window *window, int *x, int *y)
+{
+    const SDL_WindowData *data = ((SDL_WindowData *)window->driverdata);
+
+    *x = MulDiv(*x, 96, data->scaling_dpi);
+    *y = MulDiv(*y, 96, data->scaling_dpi);
+}
+
+void
+WIN_VirtualToPhysical_ClientPoint(const SDL_Window *window, int *x, int *y)
+{
+    const SDL_WindowData *data = ((SDL_WindowData *)window->driverdata);
+
+    *x = MulDiv(*x, data->scaling_dpi, 96);
+    *y = MulDiv(*y, data->scaling_dpi, 96);
+}
+
+/* Given a point in screen coordinates (they're interpreted as Windows coordinates)
+   tries to guess what DPI and which monitor Windows would assign a window located there.
+
+   If the system has a uniform DPI value on all monitors (or DPI awareness is disabled),
+   sets `uniformDPI` to SDL_TRUE and returns the value in `dpi`.
+
+   Otherwise, `uniformDPI` is set to SDL_FALSE and the DPI and rects are returned.
+*/
+static void
+WIN_DPIAtScreenPoint(int x, int y, int widthHint, int heightHint, UINT *dpi, RECT *monRectScaled, RECT *monRectUnscaled, SDL_bool *uniformDPI)
+{
+    HMONITOR monitor = NULL;
+    HRESULT result;
+    MONITORINFO moninfo = { 0 };
+    const SDL_VideoData *videodata;
+    const SDL_VideoDevice *videodevice;
+    RECT clientRect;
+    UINT unused;
+    int w, h;
+
+    /* non-DPI-aware return values */
+    *uniformDPI = SDL_TRUE;
+    *dpi = 96;
+
+    videodevice = SDL_GetVideoDevice();
+    if (!videodevice || !videodevice->driverdata)
+        return;
+
+    videodata = (SDL_VideoData *)videodevice->driverdata;
+    if (!videodata->highdpi_enabled)
+        return;
+
+    /* Check for Windows < 8.1*/
+    if (!videodata->GetDpiForMonitor) {
+        HDC hdc = GetDC(NULL);
+        if (hdc) {
+            *dpi = GetDeviceCaps(hdc, LOGPIXELSX);
+            ReleaseDC(NULL, hdc);
+        }
+        return;
+    }
+    
+    /* General case: Windows 8.1+ */
+
+    clientRect.left = x;
+    clientRect.top = y;
+    clientRect.right = x + widthHint;
+    clientRect.bottom = y + heightHint;
+
+    monitor = MonitorFromRect(&clientRect, MONITOR_DEFAULTTONEAREST);
+
+    result = videodata->GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, dpi, &unused);
+    if (result != S_OK) {
+        /* Shouldn't happen? */
+        *dpi = 96;
+        return;
+    }
+
+    moninfo.cbSize = sizeof(MONITORINFO);
+    if (!GetMonitorInfo(monitor, &moninfo)) {
+        /* Shouldn't happen? */
+        *dpi = 96;
+        return;
+    }
+
+    *uniformDPI = SDL_FALSE;
+    *monRectUnscaled = moninfo.rcMonitor;
+    *monRectScaled = moninfo.rcMonitor;
+
+    /* fix up the right/bottom of the scaled rect */
+    w = moninfo.rcMonitor.right - moninfo.rcMonitor.left;
+    h = moninfo.rcMonitor.bottom - moninfo.rcMonitor.top;
+    w = MulDiv(w, 96, *dpi);
+    h = MulDiv(h, 96, *dpi);
+
+    monRectScaled->right = monRectScaled->left + w;
+    monRectScaled->bottom = monRectScaled->top + h;
+}
+
+/* Convert an SDL to a Windows screen coordinate. */
+void WIN_VirtualToPhysical_ScreenPoint(int *x, int *y, int widthHint, int heightHint)
+{
+    RECT monitorRectScaled, monitorRectUnscaled;
+    UINT dpi;
+    SDL_bool uniformDPI;
+
+    WIN_DPIAtScreenPoint(*x, *y, widthHint, heightHint, &dpi, &monitorRectScaled, &monitorRectUnscaled, &uniformDPI);
+
+    if (uniformDPI) {
+        *x = MulDiv(*x, dpi, 96);
+        *y = MulDiv(*y, dpi, 96);
+        return;
+    }
+
+    *x = monitorRectScaled.left + MulDiv(*x - monitorRectScaled.left, dpi, 96);
+    *y = monitorRectScaled.top + MulDiv(*y - monitorRectScaled.top, dpi, 96);
+
+    /* ensure the result is not past the right/bottom of the monitor rect */
+    if (*x >= monitorRectUnscaled.right) 
+        *x = monitorRectUnscaled.right - 1;
+    if (*y >= monitorRectUnscaled.bottom) 
+        *y = monitorRectUnscaled.bottom - 1;
+}
+
+/* Converts a Windows screen coordinate to an SDL one. */
+void WIN_PhysicalToVirtual_ScreenPoint(int *x, int *y, int widthHint, int heightHint)
+{
+    RECT monitorRectScaled, monitorRectUnscaled;
+    UINT dpi;
+    SDL_bool uniformDPI;
+
+    WIN_DPIAtScreenPoint(*x, *y, widthHint, heightHint, &dpi, &monitorRectScaled, &monitorRectUnscaled, &uniformDPI);
+
+    if (uniformDPI) {
+        *x = MulDiv(*x, 96, dpi);
+        *y = MulDiv(*y, 96, dpi);
+        return;
+    }
+
+    *x = monitorRectUnscaled.left + MulDiv(*x - monitorRectUnscaled.left, 96, dpi);
+    *y = monitorRectUnscaled.top + MulDiv(*y - monitorRectUnscaled.top, 96, dpi);
 }
 
 #endif /* SDL_VIDEO_DRIVER_WINDOWS */

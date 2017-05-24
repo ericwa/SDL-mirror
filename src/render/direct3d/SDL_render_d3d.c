@@ -125,6 +125,7 @@ static void PrintShaderData(LPDWORD shader_data, DWORD shader_size)
 static SDL_Renderer *D3D_CreateRenderer(SDL_Window * window, Uint32 flags);
 static void D3D_WindowEvent(SDL_Renderer * renderer,
                             const SDL_WindowEvent *event);
+static int D3D_GetOutputSize(SDL_Renderer * renderer, int *w, int *h);
 static int D3D_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture);
 static int D3D_RecreateTexture(SDL_Renderer * renderer, SDL_Texture * texture);
 static int D3D_UpdateTexture(SDL_Renderer * renderer, SDL_Texture * texture,
@@ -468,8 +469,7 @@ D3D_ActivateRenderer(SDL_Renderer * renderer)
         SDL_Window *window = renderer->window;
         int w, h;
         Uint32 window_flags = SDL_GetWindowFlags(window);
-
-        SDL_GetWindowSize(window, &w, &h);
+        WIN_GetDrawableSize(window, &w, &h);
         data->pparams.BackBufferWidth = w;
         data->pparams.BackBufferHeight = h;
         if (window_flags & SDL_WINDOW_FULLSCREEN && (window_flags & SDL_WINDOW_FULLSCREEN_DESKTOP) != SDL_WINDOW_FULLSCREEN_DESKTOP) {
@@ -542,6 +542,7 @@ D3D_CreateRenderer(SDL_Window * window, Uint32 flags)
     }
 
     renderer->WindowEvent = D3D_WindowEvent;
+    renderer->GetOutputSize = D3D_GetOutputSize;
     renderer->CreateTexture = D3D_CreateTexture;
     renderer->UpdateTexture = D3D_UpdateTexture;
     renderer->UpdateTextureYUV = D3D_UpdateTextureYUV;
@@ -568,7 +569,7 @@ D3D_CreateRenderer(SDL_Window * window, Uint32 flags)
     SDL_GetWindowWMInfo(window, &windowinfo);
 
     window_flags = SDL_GetWindowFlags(window);
-    SDL_GetWindowSize(window, &w, &h);
+    WIN_GetDrawableSize(window, &w, &h);
     SDL_GetWindowDisplayMode(window, &fullscreen_mode);
 
     SDL_zero(pparams);
@@ -800,6 +801,13 @@ D3D_WindowEvent(SDL_Renderer * renderer, const SDL_WindowEvent *event)
     if (event->event == SDL_WINDOWEVENT_SIZE_CHANGED) {
         data->updateSize = SDL_TRUE;
     }
+}
+
+static int
+D3D_GetOutputSize(SDL_Renderer * renderer, int *w, int *h)
+{
+    WIN_GetDrawableSize(renderer->window, w, h);
+    return 0;
 }
 
 static D3DTEXTUREFILTERTYPE

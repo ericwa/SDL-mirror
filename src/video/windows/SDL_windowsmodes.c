@@ -318,11 +318,20 @@ int
 WIN_GetDisplayBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
 {
     SDL_DisplayModeData *data = (SDL_DisplayModeData *) display->current_mode.driverdata;
+    SDL_VideoData *vid_data = (SDL_VideoData *)_this->driverdata;
+
 
     rect->x = (int)SDL_ceil(data->DeviceMode.dmPosition.x * data->ScaleX);
     rect->y = (int)SDL_ceil(data->DeviceMode.dmPosition.y * data->ScaleY);
-    rect->w = (int)SDL_ceil(data->DeviceMode.dmPelsWidth * data->ScaleX);
-    rect->h = (int)SDL_ceil(data->DeviceMode.dmPelsHeight * data->ScaleY);
+    // NOTE: For high DPI, only the width/height are scaled. This matches what Windows seems to do
+    // to monitor bounds when non-DPI aware applications ask for monitor bounds of a high DPI monitor
+    if (vid_data->highdpi_enabled) {
+        rect->w = (int)SDL_ceil(data->DeviceMode.dmPelsWidth * data->ScaleX * 96.0f / data->HorzDPI);
+        rect->h = (int)SDL_ceil(data->DeviceMode.dmPelsHeight * data->ScaleY * 96.0f / data->VertDPI);
+    } else {
+        rect->w = (int)SDL_ceil(data->DeviceMode.dmPelsWidth * data->ScaleX);
+        rect->h = (int)SDL_ceil(data->DeviceMode.dmPelsHeight * data->ScaleY);
+    }
 
     return 0;
 }
@@ -348,6 +357,7 @@ WIN_GetDisplayDPI(_THIS, SDL_VideoDisplay * display, float * ddpi, float * hdpi,
 int
 WIN_GetDisplayUsableBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
 {
+    const SDL_VideoData *vid_data = (SDL_VideoData *)_this->driverdata;
     const SDL_DisplayModeData *data = (const SDL_DisplayModeData *) display->current_mode.driverdata;
     const DEVMODE *pDevMode = &data->DeviceMode;
     POINT pt = {
@@ -358,9 +368,8 @@ WIN_GetDisplayUsableBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
     HMONITOR hmon = MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
     MONITORINFO minfo;
     const RECT *work;
+    const RECT *monitor;
     BOOL rc = FALSE;
-
-    SDL_assert(hmon != NULL);
 
     if (hmon != NULL) {
         SDL_zero(minfo);
@@ -372,12 +381,23 @@ WIN_GetDisplayUsableBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
     if (!rc) {
         return SDL_SetError("Couldn't find monitor data");
     }
-
+    
+    monitor = &minfo.rcMonitor;
     work = &minfo.rcWork;
-    rect->x = (int)SDL_ceil(work->left * data->ScaleX);
-    rect->y = (int)SDL_ceil(work->top * data->ScaleY);
-    rect->w = (int)SDL_ceil((work->right - work->left) * data->ScaleX);
-    rect->h = (int)SDL_ceil((work->bottom - work->top) * data->ScaleY);
+    
+    if (vid_data->highdpi_enabled) {
+        // N.B: For x/y, only the _offset_ of the work rect from the monitor's top-left corner is scaled.
+        rect->x = monitor->left + MulDiv(work->left - monitor->left, 96, (int)data->HorzDPI);
+        rect->y = monitor->top + MulDiv(work->top - monitor->top, 96, (int)data->VertDPI);
+        // Width/height are scaled normally
+        rect->w = MulDiv(work->right - work->left, 96, (int)data->HorzDPI);
+        rect->h = MulDiv(work->bottom - work->top, 96, (int)data->VertDPI);
+    } else {
+        rect->x = (int)SDL_ceil(work->left * data->ScaleX);
+        rect->y = (int)SDL_ceil(work->top * data->ScaleY);
+        rect->w = (int)SDL_ceil((work->right - work->left) * data->ScaleX);
+        rect->h = (int)SDL_ceil((work->bottom - work->top) * data->ScaleY);
+    }
 
     return 0;
 }

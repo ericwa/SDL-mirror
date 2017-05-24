@@ -113,11 +113,17 @@ WIN_CreateDevice(int devindex)
         data->CloseTouchInputHandle = (BOOL (WINAPI *)(HTOUCHINPUT)) SDL_LoadFunction(data->userDLL, "CloseTouchInputHandle");
         data->GetTouchInputInfo = (BOOL (WINAPI *)(HTOUCHINPUT, UINT, PTOUCHINPUT, int)) SDL_LoadFunction(data->userDLL, "GetTouchInputInfo");
         data->RegisterTouchWindow = (BOOL (WINAPI *)(HWND, ULONG)) SDL_LoadFunction(data->userDLL, "RegisterTouchWindow");
+        data->SetProcessDPIAware = (BOOL (WINAPI *)(void)) SDL_LoadFunction(data->userDLL, "SetProcessDPIAware");
+        data->SetProcessDpiAwarenessContext = (BOOL (WINAPI *)(DPI_AWARENESS_CONTEXT)) SDL_LoadFunction(data->userDLL, "SetProcessDpiAwarenessContext");
+        data->EnableNonClientDpiScaling = (BOOL (WINAPI *)(HWND)) SDL_LoadFunction(data->userDLL, "EnableNonClientDpiScaling");
+        data->AdjustWindowRectExForDpi = (BOOL (WINAPI *)(LPRECT, DWORD, BOOL, DWORD, UINT)) SDL_LoadFunction(data->userDLL, "AdjustWindowRectExForDpi");
+        data->GetDpiForWindow = (UINT (WINAPI *)(HWND)) SDL_LoadFunction(data->userDLL, "GetDpiForWindow");
     }
 
     data->shcoreDLL = SDL_LoadObject("SHCORE.DLL");
     if (data->shcoreDLL) {
         data->GetDpiForMonitor = (HRESULT (WINAPI *)(HMONITOR, MONITOR_DPI_TYPE, UINT *, UINT *)) SDL_LoadFunction(data->shcoreDLL, "GetDpiForMonitor");
+        data->SetProcessDpiAwareness = (HRESULT (WINAPI *)(PROCESS_DPI_AWARENESS)) SDL_LoadFunction(data->shcoreDLL, "SetProcessDpiAwareness");
     }
 
     /* Set the function pointers */
@@ -168,6 +174,7 @@ WIN_CreateDevice(int devindex)
     device->GL_UnloadLibrary = WIN_GL_UnloadLibrary;
     device->GL_CreateContext = WIN_GL_CreateContext;
     device->GL_MakeCurrent = WIN_GL_MakeCurrent;
+    device->GL_GetDrawableSize = WIN_GL_GetDrawableSize;
     device->GL_SetSwapInterval = WIN_GL_SetSwapInterval;
     device->GL_GetSwapInterval = WIN_GL_GetSwapInterval;
     device->GL_SwapWindow = WIN_GL_SwapWindow;
@@ -205,6 +212,36 @@ VideoBootStrap WINDOWS_bootstrap = {
 int
 WIN_VideoInit(_THIS)
 {
+    SDL_VideoData *data = SDL_static_cast(SDL_VideoData *, _this->driverdata);
+
+    /* Set the process DPI awareness */
+    if (SDL_GetHintBoolean(SDL_HINT_VIDEO_HIGHDPI_ENABLED, SDL_FALSE)) {
+        /* Set this flag to indicate that the application requested DPI awareness.
+           
+           We don't want to change behaviour of apps that were requesting DPI awareness
+           from Windows, but assumed SDL was non-DPI-aware. So, only enable DPI-awareness
+           codepaths if the application explicitly set the SDL_HINT_VIDEO_HIGHDPI_ENABLED hint.
+        */
+        data->highdpi_enabled = SDL_TRUE;
+
+        if (data->SetProcessDpiAwarenessContext) {
+            /* Windows 10 Anniversary Update+ */
+            BOOL result;
+
+            /* First, try the Windows 10 Creators Update version */
+            result = data->SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+            if (!result) {
+                result = data->SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+            }
+        } else if (data->SetProcessDpiAwareness) {
+            /* Windows 8.1+ */
+            HRESULT result = data->SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+        } else if (data->SetProcessDPIAware) {
+            /* Vista+ */
+            BOOL success = data->SetProcessDPIAware();
+        }
+    }
+
     if (WIN_InitModes(_this) < 0) {
         return -1;
     }

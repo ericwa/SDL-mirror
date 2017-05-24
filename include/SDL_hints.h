@@ -454,6 +454,11 @@ extern "C" {
  */
 #define SDL_HINT_VIDEO_HIGHDPI_DISABLED "SDL_VIDEO_HIGHDPI_DISABLED"
 
+ /**
+ *  \brief If set to 1, then allow high-DPI on all windows.
+ */
+#define SDL_HINT_VIDEO_HIGHDPI_ENABLED "SDL_VIDEO_HIGHDPI_ENABLED"
+
 /**
  *  \brief A variable that determines whether ctrl+click should generate a right-click event on Mac
  *

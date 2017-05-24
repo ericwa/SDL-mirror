@@ -85,7 +85,31 @@ typedef enum MONITOR_DPI_TYPE {
     MDT_DEFAULT = MDT_EFFECTIVE_DPI
 } MONITOR_DPI_TYPE;
 
+typedef enum PROCESS_DPI_AWARENESS {
+    PROCESS_DPI_UNAWARE = 0,
+    PROCESS_SYSTEM_DPI_AWARE = 1,
+    PROCESS_PER_MONITOR_DPI_AWARE = 2
+} PROCESS_DPI_AWARENESS;
+
 #endif /* WINVER < 0x0603 */
+
+/* Windows 10 Anniversary Update */
+#if NTDDI_VERSION < 0x0A000002
+
+DECLARE_HANDLE(DPI_AWARENESS_CONTEXT);
+
+#define DPI_AWARENESS_CONTEXT_UNAWARE           ((DPI_AWARENESS_CONTEXT)-1)
+#define DPI_AWARENESS_CONTEXT_SYSTEM_AWARE      ((DPI_AWARENESS_CONTEXT)-2)
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE ((DPI_AWARENESS_CONTEXT)-3)
+
+#endif /* NTDDI_VERSION < 0x0A000002 */
+
+/* Windows 10 Creators Update */
+#if NTDDI_VERSION < 0x0A000003
+
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((DPI_AWARENESS_CONTEXT)-4)
+
+#endif /* NTDDI_VERSION < 0x0A000003 */
 
 typedef BOOL  (*PFNSHFullScreen)(HWND, DWORD);
 typedef void  (*PFCoordTransform)(SDL_Window*, POINT*);
@@ -134,13 +158,21 @@ typedef struct SDL_VideoData
     BOOL (WINAPI *CloseTouchInputHandle)( HTOUCHINPUT );
     BOOL (WINAPI *GetTouchInputInfo)( HTOUCHINPUT, UINT, PTOUCHINPUT, int );
     BOOL (WINAPI *RegisterTouchWindow)( HWND, ULONG );
+    BOOL (WINAPI *SetProcessDPIAware)( void );
+    BOOL (WINAPI *SetProcessDpiAwarenessContext)( DPI_AWARENESS_CONTEXT );
+    BOOL (WINAPI *EnableNonClientDpiScaling)( HWND );
+    BOOL (WINAPI *AdjustWindowRectExForDpi)( LPRECT, DWORD, BOOL, DWORD, UINT );
+    UINT (WINAPI *GetDpiForWindow)( HWND );
 
     void* shcoreDLL;
     HRESULT (WINAPI *GetDpiForMonitor)( HMONITOR         hmonitor,
                                         MONITOR_DPI_TYPE dpiType,
                                         UINT             *dpiX,
                                         UINT             *dpiY );
-    
+    HRESULT (WINAPI *SetProcessDpiAwareness)(PROCESS_DPI_AWARENESS dpiAwareness);
+
+    SDL_bool highdpi_enabled;
+
     SDL_bool ime_com_initialized;
     struct ITfThreadMgr *ime_threadmgr;
     SDL_bool ime_initialized;

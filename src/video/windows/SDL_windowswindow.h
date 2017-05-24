@@ -49,6 +49,7 @@ typedef struct
 #if SDL_VIDEO_OPENGL_EGL  
     EGLSurface egl_surface;
 #endif
+    int scaling_dpi;
 } SDL_WindowData;
 
 extern int WIN_CreateWindow(_THIS, SDL_Window * window);
@@ -76,6 +77,12 @@ extern SDL_bool WIN_GetWindowWMInfo(_THIS, SDL_Window * window,
 extern void WIN_OnWindowEnter(_THIS, SDL_Window * window);
 extern void WIN_UpdateClipCursor(SDL_Window *window);
 extern int WIN_SetWindowHitTest(SDL_Window *window, SDL_bool enabled);
+extern void WIN_GetDrawableSize(const SDL_Window *window, int *w, int *h);
+extern void WIN_PhysicalToVirtual_ClientPoint(const SDL_Window *window, int *w, int *h);
+extern void WIN_VirtualToPhysical_ClientPoint(const SDL_Window *window, int *w, int *h);
+extern void WIN_VirtualToPhysical_ScreenPoint(int *x, int *y, int widthHint, int heightHint);
+extern void WIN_PhysicalToVirtual_ScreenPoint(int *x, int *y, int widthHint, int heightHint);
+extern void WIN_AdjustRect(const SDL_Window *window, LPRECT rect);
 
 #endif /* _SDL_windowswindow_h */
 

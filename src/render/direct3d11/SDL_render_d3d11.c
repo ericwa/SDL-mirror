@@ -716,6 +716,7 @@ static const DWORD D3D11_VertexShader[] = {
 static SDL_Renderer *D3D11_CreateRenderer(SDL_Window * window, Uint32 flags);
 static void D3D11_WindowEvent(SDL_Renderer * renderer,
                             const SDL_WindowEvent *event);
+static int D3D11_GetOutputSize(SDL_Renderer * renderer, int *w, int *h);
 static int D3D11_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture);
 static int D3D11_UpdateTexture(SDL_Renderer * renderer, SDL_Texture * texture,
                              const SDL_Rect * rect, const void *srcPixels,
@@ -826,6 +827,7 @@ D3D11_CreateRenderer(SDL_Window * window, Uint32 flags)
     }
 
     renderer->WindowEvent = D3D11_WindowEvent;
+    renderer->GetOutputSize = D3D11_GetOutputSize;
     renderer->CreateTexture = D3D11_CreateTexture;
     renderer->UpdateTexture = D3D11_UpdateTexture;
     renderer->UpdateTextureYUV = D3D11_UpdateTextureYUV;
@@ -1532,7 +1534,7 @@ D3D11_CreateWindowSizeDependentResources(SDL_Renderer * renderer)
     /* The width and height of the swap chain must be based on the display's
      * non-rotated size.
      */
-    SDL_GetWindowSize(renderer->window, &w, &h);
+    WIN_GetDrawableSize(renderer->window, &w, &h);
     data->rotation = D3D11_GetCurrentRotation();
     /* SDL_Log("%s: windowSize={%d,%d}, orientation=%d\n", __FUNCTION__, w, h, (int)data->rotation); */
     if (D3D11_IsDisplayRotated90Degrees(data->rotation)) {
@@ -1692,6 +1694,13 @@ D3D11_WindowEvent(SDL_Renderer * renderer, const SDL_WindowEvent *event)
     if (event->event == SDL_WINDOWEVENT_SIZE_CHANGED) {
         D3D11_UpdateForWindowSizeChange(renderer);
     }
+}
+
+static int
+D3D11_GetOutputSize(SDL_Renderer * renderer, int *w, int *h)
+{
+    WIN_GetDrawableSize(renderer->window, w, h);
+    return 0;
 }
 
 static D3D11_FILTER
