@@ -18,36 +18,25 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "../../SDL_internal.h"
+#ifndef _SDL_jackaudio_h
+#define _SDL_jackaudio_h
 
-#ifndef _SDL_artsaudio_h
-#define _SDL_artsaudio_h
-
-#include <artsc.h>
+#include <jack/jack.h>
 
 #include "../SDL_sysaudio.h"
 
 /* Hidden "this" pointer for the audio functions */
-#define _THIS   SDL_AudioDevice *this
+#define _THIS SDL_AudioDevice *this
 
 struct SDL_PrivateAudioData
 {
-    /* The stream descriptor for the audio device */
-    arts_stream_t stream;
-
-    /* The parent process id, to detect when application quits */
-    pid_t parent;
-
-    /* Raw mixing buffer */
-    Uint8 *mixbuf;
-    int mixlen;
-
-    /* Support for audio timing using a timer, in addition to select() */
-    float frame_ticks;
-    float next_frame;
+    jack_client_t *client;
+    SDL_sem *iosem;
+    float *iobuffer;
+    const char **devports;
+    jack_port_t **sdlports;
 };
-#define FUDGE_TICKS 10      /* The scheduler overhead ticks per frame */
 
-#endif /* _SDL_artsaudio_h */
+#endif /* _SDL_jackaudio_h */
 
 /* vi: set ts=4 sw=4 expandtab: */

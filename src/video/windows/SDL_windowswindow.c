@@ -89,7 +89,7 @@ WIN_SetWindowPositionInternal(_THIS, SDL_Window * window, UINT flags)
     int w, h;
 
     /* Figure out what the window area will be */
-    if (SDL_ShouldAllowTopmost() && ((window->flags & (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_INPUT_FOCUS)) == (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_INPUT_FOCUS) || window->flags & SDL_WINDOW_ALWAYS_ON_TOP)) {
+    if (SDL_ShouldAllowTopmost() && ((window->flags & (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_INPUT_FOCUS)) == (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_INPUT_FOCUS) || (window->flags & SDL_WINDOW_ALWAYS_ON_TOP))) {
         top = HWND_TOPMOST;
     } else {
         top = HWND_NOTOPMOST;
@@ -196,7 +196,7 @@ WIN_AdjustRect(const SDL_Window * window, LPRECT rect)
 }
 
 static int
-SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, SDL_bool created)
+SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, HWND parent, SDL_bool created)
 {
     SDL_VideoData *videodata = (SDL_VideoData *) _this->driverdata;
     SDL_WindowData *data;
@@ -208,6 +208,7 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, SDL_bool created)
     }
     data->window = window;
     data->hwnd = hwnd;
+    data->parent = parent;
     data->hdc = GetDC(hwnd);
     data->hinstance = (HINSTANCE) GetWindowLongPtr(hwnd, GWLP_HINSTANCE);
     data->created = created;
@@ -355,8 +356,12 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, SDL_bool created)
 int
 WIN_CreateWindow(_THIS, SDL_Window * window)
 {
-    HWND hwnd;
+    HWND hwnd, parent = NULL;
     DWORD style = STYLE_BASIC;
+
+    if (window->flags & SDL_WINDOW_SKIP_TASKBAR) {
+        parent = CreateWindow(SDL_Appname, TEXT(""), STYLE_BASIC, 0, 0, 32, 32, NULL, NULL, SDL_Instance, NULL);
+    }
 
     style |= GetWindowStyle(window);
 
@@ -364,7 +369,7 @@ WIN_CreateWindow(_THIS, SDL_Window * window)
        with a width/height of 0, then in SetupWindowData we will check the
        DPI and adjust the position and size to match window->x,y,w,h */
     hwnd =
-        CreateWindow(SDL_Appname, TEXT(""), style, CW_USEDEFAULT, 0, 0, 0, NULL, NULL,
+        CreateWindow(SDL_Appname, TEXT(""), style, CW_USEDEFAULT, 0, 0, 0, parent, NULL,
                      SDL_Instance, NULL);
     if (!hwnd) {
         return WIN_SetError("Couldn't create window");
@@ -372,8 +377,11 @@ WIN_CreateWindow(_THIS, SDL_Window * window)
 
     WIN_PumpEvents(_this);
 
-    if (SetupWindowData(_this, window, hwnd, SDL_TRUE) < 0) {
+    if (SetupWindowData(_this, window, hwnd, parent, SDL_TRUE) < 0) {
         DestroyWindow(hwnd);
+        if (parent) {
+            DestroyWindow(parent);
+        }
         return -1;
     }
 
@@ -434,7 +442,7 @@ WIN_CreateWindowFrom(_THIS, SDL_Window * window, const void *data)
         SDL_stack_free(title);
     }
 
-    if (SetupWindowData(_this, window, hwnd, SDL_FALSE) < 0) {
+    if (SetupWindowData(_this, window, hwnd, GetParent(hwnd), SDL_FALSE) < 0) {
         return -1;
     }
 
@@ -767,6 +775,9 @@ WIN_DestroyWindow(_THIS, SDL_Window * window)
         RemoveProp(data->hwnd, TEXT("SDL_WindowData"));
         if (data->created) {
             DestroyWindow(data->hwnd);
+            if (data->parent) {
+                DestroyWindow(data->parent);
+            }
         } else {
             /* Restore any original event handler... */
             if (data->wndproc != NULL) {
