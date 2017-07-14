@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2017 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 2017 BlackBerry Limited
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -18,15 +18,31 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
-#include "../SDL_internal.h"
 
-#ifndef SDL_gesture_c_h_
-#define SDL_gesture_c_h_
+#ifndef __SDL_QNX_H__
+#define __SDL_QNX_H__
 
-extern int SDL_GestureAddTouch(SDL_TouchID touchId);
+#include "../SDL_sysvideo.h"
+#include <screen/screen.h>
+#include <EGL/egl.h>
 
-extern void SDL_GestureProcessEvent(SDL_Event* event);
+typedef struct
+{
+    screen_window_t window;
+    EGLSurface      surface;
+    EGLConfig       conf;
+} window_impl_t;
 
-#endif /* SDL_gesture_c_h_ */
+extern void handleKeyboardEvent(screen_event_t event);
 
-/* vi: set ts=4 sw=4 expandtab: */
+extern int glGetConfig(EGLConfig *pconf, int *pformat);
+extern int glLoadLibrary(_THIS, const char *name);
+void *glGetProcAddress(_THIS, const char *proc);
+extern SDL_GLContext glCreateContext(_THIS, SDL_Window *window);
+extern int glSetSwapInterval(_THIS, int interval);
+extern void glSwapWindow(_THIS, SDL_Window *window);
+extern int glMakeCurrent(_THIS, SDL_Window * window, SDL_GLContext context);
+extern void glDeleteContext(_THIS, SDL_GLContext context);
+extern void glUnloadLibrary(_THIS);
+
+#endif
