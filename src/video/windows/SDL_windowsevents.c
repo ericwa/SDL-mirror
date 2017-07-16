@@ -1046,6 +1046,10 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             w = data->window->w;
             h = data->window->h;
             WIN_VirtualToPhysical_ClientPoint(data->window, &w, &h);
+#ifdef HIGHDPI_DEBUG
+            SDL_Log("WM_DPICHANGED: current SDL window size is (%dx%d) points, want (%dx%d) pixels client size at new DPI (%d)\n",
+                data->window->w, data->window->h, w, h, newDPI);
+#endif
 
             size.top = 0;
             size.left = 0;
