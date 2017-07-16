@@ -115,6 +115,8 @@ WIN_CreateDevice(int devindex)
         data->RegisterTouchWindow = (BOOL (WINAPI *)(HWND, ULONG)) SDL_LoadFunction(data->userDLL, "RegisterTouchWindow");
         data->SetProcessDPIAware = (BOOL (WINAPI *)(void)) SDL_LoadFunction(data->userDLL, "SetProcessDPIAware");
         data->SetProcessDpiAwarenessContext = (BOOL (WINAPI *)(DPI_AWARENESS_CONTEXT)) SDL_LoadFunction(data->userDLL, "SetProcessDpiAwarenessContext");
+        data->GetThreadDpiAwarenessContext = (DPI_AWARENESS_CONTEXT (WINAPI *)(void)) SDL_LoadFunction(data->userDLL, "GetThreadDpiAwarenessContext");
+        data->GetAwarenessFromDpiAwarenessContext = (DPI_AWARENESS (WINAPI *)(DPI_AWARENESS_CONTEXT)) SDL_LoadFunction(data->userDLL, "GetAwarenessFromDpiAwarenessContext");
         data->EnableNonClientDpiScaling = (BOOL (WINAPI *)(HWND)) SDL_LoadFunction(data->userDLL, "EnableNonClientDpiScaling");
         data->AdjustWindowRectExForDpi = (BOOL (WINAPI *)(LPRECT, DWORD, BOOL, DWORD, UINT)) SDL_LoadFunction(data->userDLL, "AdjustWindowRectExForDpi");
         data->GetDpiForWindow = (UINT (WINAPI *)(HWND)) SDL_LoadFunction(data->userDLL, "GetDpiForWindow");

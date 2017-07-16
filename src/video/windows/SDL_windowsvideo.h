@@ -93,6 +93,18 @@ typedef enum PROCESS_DPI_AWARENESS {
 
 #endif /* WINVER < 0x0603 */
 
+/* Windows 10 */
+#if WINVER < 0x0A00
+
+typedef enum DPI_AWARENESS {
+    DPI_AWARENESS_INVALID = -1,
+    DPI_AWARENESS_UNAWARE = 0,
+    DPI_AWARENESS_SYSTEM_AWARE = 1,
+    DPI_AWARENESS_PER_MONITOR_AWARE = 2
+} DPI_AWARENESS;
+
+#endif
+
 /* Windows 10 Anniversary Update */
 #if NTDDI_VERSION < 0x0A000002
 
@@ -160,6 +172,8 @@ typedef struct SDL_VideoData
     BOOL (WINAPI *RegisterTouchWindow)( HWND, ULONG );
     BOOL (WINAPI *SetProcessDPIAware)( void );
     BOOL (WINAPI *SetProcessDpiAwarenessContext)( DPI_AWARENESS_CONTEXT );
+    DPI_AWARENESS_CONTEXT (WINAPI *GetThreadDpiAwarenessContext)( void );
+    DPI_AWARENESS (WINAPI *GetAwarenessFromDpiAwarenessContext)( DPI_AWARENESS_CONTEXT );
     BOOL (WINAPI *EnableNonClientDpiScaling)( HWND );
     BOOL (WINAPI *AdjustWindowRectExForDpi)( LPRECT, DWORD, BOOL, DWORD, UINT );
     UINT (WINAPI *GetDpiForWindow)( HWND );
