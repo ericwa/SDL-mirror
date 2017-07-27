@@ -632,6 +632,18 @@ SDL_AddVideoDisplay(const SDL_VideoDisplay * display)
 }
 
 int
+SDL_ClearVideoDisplays(void)
+{
+    if (!_this) {
+        return SDL_UninitializedVideo();
+    }
+    SDL_free(_this->displays);
+    _this->displays = NULL;
+    _this->num_displays = 0;
+    return 0;
+}
+
+int
 SDL_GetNumVideoDisplays(void)
 {
     if (!_this) {

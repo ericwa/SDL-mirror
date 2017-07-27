@@ -210,14 +210,16 @@ Cocoa_GetDisplayName(CGDirectDisplayID displayID)
     return displayName;
 }
 
-void
-Cocoa_InitModes(_THIS)
+static void
+Cocoa_AddDisplays(_THIS)
 { @autoreleasepool
 {
     CGDisplayErr result;
     CGDirectDisplayID *displays;
     CGDisplayCount numDisplays;
     int pass, i;
+    
+    SDL_assert(_this->num_displays == 0);
 
     result = CGGetOnlineDisplayList(0, NULL, &numDisplays);
     if (result != kCGErrorSuccess) {
@@ -291,6 +293,41 @@ Cocoa_InitModes(_THIS)
         }
     }
     SDL_stack_free(displays);
+}}
+
+static void
+Cocoa_DisplayReconfigurationCallback(CGDirectDisplayID display,
+                                     CGDisplayChangeSummaryFlags flags,
+                                     void * userInfo)
+{ @autoreleasepool
+{
+    SDL_VideoDevice *device = (SDL_VideoDevice *) userInfo;
+    
+    if (device != SDL_GetVideoDevice())
+        return; /* Shouldn't happen */
+    
+    if ((flags & kCGDisplayBeginConfigurationFlag) == kCGDisplayBeginConfigurationFlag) {
+        /* We get two notifications for each change, once before with this flag
+           set, and one after. Ignore the notifications before the change */
+        return;
+    }
+    
+    /* Cocoa tells us which display was added/removed. For now, just
+       clear the list of displays and enumerate all of them */
+    
+    if (SDL_ClearVideoDisplays() != 0)
+        return; /* Shouldn't happen */
+    
+    Cocoa_AddDisplays(device);
+}}
+
+void
+Cocoa_InitModes(_THIS)
+{ @autoreleasepool
+{
+    Cocoa_AddDisplays(_this);
+    
+    CGDisplayRegisterReconfigurationCallback(Cocoa_DisplayReconfigurationCallback, _this);
 }}
 
 int
@@ -512,6 +549,8 @@ Cocoa_QuitModes(_THIS)
 
     }
     Cocoa_ToggleMenuBar(YES);
+    
+    CGDisplayRemoveReconfigurationCallback(Cocoa_DisplayReconfigurationCallback, _this);
 }
 
 #endif /* SDL_VIDEO_DRIVER_COCOA */
