@@ -30,6 +30,114 @@
 #define CDS_FULLSCREEN 0
 #endif
 
+#ifndef WM_DISPLAYCHANGE
+#define WM_DISPLAYCHANGE 0x007E
+#endif
+
+/* Helper window to listen for WM_DISPLAYCHANGE */
+static HWND WIN_DisplayChangeHelperWindow;
+static WCHAR *WIN_DisplayChangeHelperWindowClassName = TEXT("SDLDisplayChangeHelperWindowClass");
+static WCHAR *WIN_DisplayChangeHelperWindowName = TEXT("SDLDisplayChangeHelperWindow");
+static ATOM WIN_DisplayChangeHelperWindowClass;
+
+static void WIN_AddDisplays(_THIS);
+
+static void
+WIN_HandleDisplayChange(void)
+{
+    SDL_VideoDevice *device = SDL_GetVideoDevice();
+
+    if (device == NULL)
+        return; /* Shouldn't happen */
+
+    if (SDL_ClearVideoDisplays() != 0)
+        return; /* Shouldn't happen */
+
+    WIN_AddDisplays(device);
+}
+
+static LRESULT CALLBACK
+WIN_DisplayChangeHelperWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg) {
+    case WM_DISPLAYCHANGE:
+        WIN_HandleDisplayChange();
+        break;
+    }
+    return CallWindowProc(DefWindowProc, hwnd, msg, wParam, lParam);
+}
+
+/*
+* Creates a helper window to listen for WM_DISPLAYCHANGE
+*/
+static int
+WIN_DisplayChangeHelperWindowCreate(void)
+{
+    HINSTANCE hInstance = GetModuleHandle(NULL);
+    WNDCLASS wce;
+
+    /* Make sure window isn't created twice. */
+    if (WIN_DisplayChangeHelperWindow != NULL) {
+        return 0;
+    }
+
+    /* Create the class. */
+    SDL_zero(wce);
+    wce.lpfnWndProc = WIN_DisplayChangeHelperWindowProc; 
+    wce.lpszClassName = (LPCWSTR)WIN_DisplayChangeHelperWindowClassName;
+    wce.hInstance = hInstance;
+
+    /* Register the class. */
+    WIN_DisplayChangeHelperWindowClass = RegisterClass(&wce);
+    if (WIN_DisplayChangeHelperWindowClass == 0 && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
+        return WIN_SetError("Unable to create Helper Window Class");
+    }
+
+    /* Create the window. */
+    WIN_DisplayChangeHelperWindow = CreateWindowEx(0, 
+        WIN_DisplayChangeHelperWindowClassName,
+        WIN_DisplayChangeHelperWindowName,
+        WS_OVERLAPPED, CW_USEDEFAULT,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        CW_USEDEFAULT, NULL, NULL,
+        hInstance, NULL);
+
+    if (WIN_DisplayChangeHelperWindow == NULL) {
+        UnregisterClass(WIN_DisplayChangeHelperWindowClassName, hInstance);
+        return WIN_SetError("Unable to create Helper Window");
+    }
+
+    return 0;
+}
+
+
+/*
+* Destroys the window previously created with WIN_DisplayChangeHelperWindowCreate.
+*/
+static void
+WIN_DisplayChangeHelperWindowDestroy(void)
+{
+    HINSTANCE hInstance = GetModuleHandle(NULL);
+
+    /* Destroy the window. */
+    if (WIN_DisplayChangeHelperWindow != NULL) {
+        if (DestroyWindow(WIN_DisplayChangeHelperWindow) == 0) {
+            WIN_SetError("Unable to destroy Helper Window");
+            return;
+        }
+        WIN_DisplayChangeHelperWindow = NULL;
+    }
+
+    /* Unregister the class. */
+    if (WIN_DisplayChangeHelperWindowClass != 0) {
+        if ((UnregisterClass(WIN_DisplayChangeHelperWindowClassName, hInstance)) == 0) {
+            WIN_SetError("Unable to destroy Helper Window Class");
+            return;
+        }
+        WIN_DisplayChangeHelperWindowClass = 0;
+    }
+}
+
 typedef struct _WIN_GetMonitorDPIData {
     SDL_VideoData *vid_data;
     SDL_DisplayMode *mode;
@@ -251,14 +359,16 @@ WIN_AddDisplay(_THIS, LPTSTR DeviceName)
     return SDL_TRUE;
 }
 
-int
-WIN_InitModes(_THIS)
+static void
+WIN_AddDisplays(_THIS)
 {
     int pass;
     DWORD i, j, count;
     DISPLAY_DEVICE device;
 
     device.cb = sizeof(device);
+
+    SDL_assert(_this->num_displays == 0);
 
     /* Get the primary display in the first pass */
     for (pass = 0; pass < 2; ++pass) {
@@ -308,9 +418,18 @@ WIN_InitModes(_THIS)
             }
         }
     }
+}
+
+int
+WIN_InitModes(_THIS)
+{
+    WIN_AddDisplays(_this);
+
     if (_this->num_displays == 0) {
         return SDL_SetError("No displays available");
     }
+
+    WIN_DisplayChangeHelperWindowCreate();
     return 0;
 }
 
@@ -447,6 +566,8 @@ void
 WIN_QuitModes(_THIS)
 {
     /* All fullscreen windows should have restored modes by now */
+
+    WIN_DisplayChangeHelperWindowDestroy();
 }
 
 #endif /* SDL_VIDEO_DRIVER_WINDOWS */
