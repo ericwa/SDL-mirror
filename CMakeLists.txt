@@ -2,7 +2,7 @@ if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
   message(FATAL_ERROR "Prevented in-tree built. Please create a build directory outside of the SDL source code and call cmake from there")
 endif()
 
-cmake_minimum_required(VERSION 2.8.5)
+cmake_minimum_required(VERSION 2.8.11)
 project(SDL2 C)
 
 # !!! FIXME: this should probably do "MACOSX_RPATH ON" as a target property
@@ -45,6 +45,12 @@ set(SDL_MICRO_VERSION 5)
 set(SDL_INTERFACE_AGE 1)
 set(SDL_BINARY_AGE 5)
 set(SDL_VERSION "${SDL_MAJOR_VERSION}.${SDL_MINOR_VERSION}.${SDL_MICRO_VERSION}")
+
+# Set defaults preventing destination file conflicts
+set(CMAKE_DEBUG_POSTFIX "d"
+    CACHE STRING "Name suffix for debug builds")
+
+mark_as_advanced(CMAKE_IMPORT_LIBRARY_SUFFIX CMAKE_DEBUG_POSTFIX)
 
 # Calculate a libtool-like version number
 math(EXPR LT_CURRENT "${SDL_MICRO_VERSION} - ${SDL_INTERFACE_AGE}")
@@ -159,6 +165,10 @@ else()
   set(OPT_DEF_ASM FALSE)
 endif()
 
+if(USE_GCC OR USE_CLANG)
+  set(OPT_DEF_GCC_ATOMICS ON)
+endif()
+
 # Default flags, if not set otherwise
 if("$ENV{CFLAGS}" STREQUAL "")
   if(CMAKE_BUILD_TYPE STREQUAL "")
@@ -257,7 +267,7 @@ endforeach()
 option_string(ASSERTIONS "Enable internal sanity checks (auto/disabled/release/enabled/paranoid)" "auto")
 #set_option(DEPENDENCY_TRACKING "Use gcc -MMD -MT dependency tracking" ON)
 set_option(LIBC                "Use the system C library" ${OPT_DEF_LIBC})
-set_option(GCC_ATOMICS         "Use gcc builtin atomics" ${USE_GCC})
+set_option(GCC_ATOMICS         "Use gcc builtin atomics" ${OPT_DEF_GCC_ATOMICS})
 set_option(ASSEMBLY            "Enable assembly routines" ${OPT_DEF_ASM})
 set_option(SSEMATH             "Allow GCC to use SSE floating point math" ${OPT_DEF_SSEMATH})
 set_option(MMX                 "Use MMX assembly routines" ${OPT_DEF_ASM})
@@ -314,6 +324,8 @@ set_option(VIDEO_COCOA         "Use Cocoa video driver" ${APPLE})
 set_option(DIRECTX             "Use DirectX for Windows audio/video" ${WINDOWS})
 set_option(RENDER_D3D          "Enable the Direct3D render driver" ${WINDOWS})
 set_option(VIDEO_VIVANTE       "Use Vivante EGL video driver" ${UNIX_SYS})
+set_option(VIDEO_KMSDRM        "Use KMS DRM video driver" ${UNIX_SYS})
+dep_option(KMSDRM_SHARED       "Dynamically load KMS DRM support" ON "VIDEO_KMSDRM" OFF)
 
 # TODO: We should (should we?) respect cmake's ${BUILD_SHARED_LIBS} flag here
 # The options below are for compatibility to configure's default behaviour.
@@ -790,11 +802,23 @@ if(ANDROID)
     set(SOURCE_FILES ${SOURCE_FILES} ${ANDROID_JOYSTICK_SOURCES})
     set(HAVE_SDL_JOYSTICK TRUE)
   endif()
+  if(SDL_LOADSO)
+    set(SDL_LOADSO_DLOPEN 1)
+    file(GLOB LOADSO_SOURCES ${SDL2_SOURCE_DIR}/src/loadso/dlopen/*.c)
+    set(SOURCE_FILES ${SOURCE_FILES} ${LOADSO_SOURCES})
+    set(HAVE_SDL_LOADSO TRUE)
+  endif()
   if(SDL_POWER)
     set(SDL_POWER_ANDROID 1)
     file(GLOB ANDROID_POWER_SOURCES ${SDL2_SOURCE_DIR}/src/power/android/*.c)
     set(SOURCE_FILES ${SOURCE_FILES} ${ANDROID_POWER_SOURCES})
     set(HAVE_SDL_POWER TRUE)
+  endif()
+  if(SDL_TIMERS)
+    set(SDL_TIMER_UNIX 1)
+    file(GLOB TIMER_SOURCES ${SDL2_SOURCE_DIR}/src/timer/unix/*.c)
+    set(SOURCE_FILES ${SOURCE_FILES} ${TIMER_SOURCES})
+    set(HAVE_SDL_TIMERS TRUE)
   endif()
   if(SDL_VIDEO)
     set(SDL_VIDEO_DRIVER_ANDROID 1)
@@ -821,6 +845,9 @@ if(ANDROID)
       list(APPEND EXTRA_LIBS ${OpenGLES1_LIBRARY} ${OpenGLES2_LIBRARY})
     endif()
   endif()
+
+  CheckPTHREAD()
+
   list(APPEND EXTRA_LDFLAGS "-Wl,--undefined=Java_org_libsdl_app_SDLActivity_nativeInit")
 endif()
 
@@ -917,6 +944,7 @@ elseif(UNIX AND NOT APPLE AND NOT ANDROID)
     CheckOpenGLESX11()
     CheckWayland()
     CheckVivante()
+    CheckKMSDRM()
   endif()
 
   if(LINUX)
@@ -1071,9 +1099,9 @@ elseif(WINDOWS)
 
   if(MSVC)
     # Prevent codegen that would use the VC runtime libraries.
-    add_definitions(/GS-)
+    set_property(DIRECTORY . APPEND PROPERTY COMPILE_OPTIONS "/GS-")
     if(NOT ARCH_64)
-      add_definitions(/arch:SSE)
+      set_property(DIRECTORY . APPEND PROPERTY COMPILE_OPTIONS "/arch:SSE")
     endif()
   endif()
 
@@ -1609,11 +1637,14 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_CFLAGS}")
 
 # Always build SDLmain
 add_library(SDL2main STATIC ${SDLMAIN_SOURCES})
+target_include_directories(SDL2main PUBLIC $<INSTALL_INTERFACE:include>)
 set(_INSTALL_LIBS "SDL2main")
 
 if(SDL_SHARED)
   add_library(SDL2 SHARED ${SOURCE_FILES} ${VERSION_SOURCES})
-  if(UNIX AND NOT ANDROID)
+  if(APPLE)
+    set_target_properties(SDL2 PROPERTIES MACOSX_RPATH 1)
+  elseif(UNIX AND NOT ANDROID)
     set_target_properties(SDL2 PROPERTIES
       VERSION ${LT_VERSION}
       SOVERSION ${LT_REVISION}
@@ -1632,12 +1663,19 @@ if(SDL_SHARED)
   endif()
   set(_INSTALL_LIBS "SDL2" ${_INSTALL_LIBS})
   target_link_libraries(SDL2 ${EXTRA_LIBS} ${EXTRA_LDFLAGS})
+  target_include_directories(SDL2 PUBLIC $<INSTALL_INTERFACE:include>)
 endif()
 
 if(SDL_STATIC)
   set (BUILD_SHARED_LIBS FALSE)
   add_library(SDL2-static STATIC ${SOURCE_FILES})
-  set_target_properties(SDL2-static PROPERTIES OUTPUT_NAME "SDL2")
+  if (NOT SDL_SHARED OR NOT WIN32)
+    set_target_properties(SDL2-static PROPERTIES OUTPUT_NAME "SDL2")
+    # Note: Apparently, OUTPUT_NAME must really be unique; even when
+    # CMAKE_IMPORT_LIBRARY_SUFFIX or the like are given. Otherwise
+    # the static build may race with the import lib and one will get
+    # clobbered, when the suffix is realized via subsequent rename.
+  endif()
   set_target_properties(SDL2-static PROPERTIES POSITION_INDEPENDENT_CODE ${SDL_STATIC_PIC})
   if(MSVC AND NOT LIBC)
     set_target_properties(SDL2-static PROPERTIES LINK_FLAGS_RELEASE "/NODEFAULTLIB")
@@ -1648,13 +1686,42 @@ if(SDL_STATIC)
   # libraries - do we need to consider this?
   set(_INSTALL_LIBS "SDL2-static" ${_INSTALL_LIBS})
   target_link_libraries(SDL2-static ${EXTRA_LIBS} ${EXTRA_LDFLAGS})
+  target_include_directories(SDL2-static PUBLIC $<INSTALL_INTERFACE:include>)
 endif()
 
 ##### Installation targets #####
-install(TARGETS ${_INSTALL_LIBS}
+install(TARGETS ${_INSTALL_LIBS} EXPORT SDL2Targets
   LIBRARY DESTINATION "lib${LIB_SUFFIX}"
   ARCHIVE DESTINATION "lib${LIB_SUFFIX}"
   RUNTIME DESTINATION bin)
+
+##### Export files #####
+if (APPLE)
+  set(PKG_PREFIX "SDL2.framework/Resources")
+elseif (WINDOWS)
+  set(PKG_PREFIX "cmake")
+else ()
+  set(PKG_PREFIX "lib/cmake/SDL2")
+endif ()
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file("${CMAKE_BINARY_DIR}/SDL2ConfigVersion.cmake"
+  VERSION ${SDL_VERSION}
+  COMPATIBILITY AnyNewerVersion
+)
+
+install(EXPORT SDL2Targets
+  FILE SDL2Targets.cmake
+  NAMESPACE SDL2::
+  DESTINATION ${PKG_PREFIX}
+)
+install(
+  FILES
+    ${CMAKE_SOURCE_DIR}/SDL2Config.cmake
+    ${CMAKE_BINARY_DIR}/SDL2ConfigVersion.cmake
+  DESTINATION ${PKG_PREFIX}
+  COMPONENT Devel
+)
 
 file(GLOB INCLUDE_FILES ${SDL2_SOURCE_DIR}/include/*.h)
 file(GLOB BIN_INCLUDE_FILES ${SDL2_BINARY_DIR}/include/*.h)

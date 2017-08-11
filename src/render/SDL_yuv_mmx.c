@@ -20,7 +20,9 @@
 */
 #include "../SDL_internal.h"
 
-#if (__GNUC__ > 2) && defined(__i386__) && __OPTIMIZE__ && SDL_ASSEMBLY_ROUTINES
+#include "SDL_yuv_mmx_c.h"
+
+#ifdef USE_MMX_ASSEMBLY
 
 #include "SDL_stdinc.h"
 
@@ -402,6 +404,6 @@ void Color565DitherYV12MMX1X( int *colortab, Uint32 *rgb_2_pix,
 
 /* *INDENT-ON* */
 
-#endif /* GCC3 i386 inline assembly */
+#endif /* USE_MMX_ASSEMBLY */
 
 /* vi: set ts=4 sw=4 expandtab: */

@@ -105,6 +105,9 @@ static VideoBootStrap *bootstrap[] = {
 #if SDL_VIDEO_DRIVER_RPI
     &RPI_bootstrap,
 #endif 
+#if SDL_VIDEO_DRIVER_KMSDRM
+    &KMSDRM_bootstrap,
+#endif
 #if SDL_VIDEO_DRIVER_NACL
     &NACL_bootstrap,
 #endif
@@ -2897,7 +2900,7 @@ SDL_GL_ExtensionSupported(const char *extension)
             break;
 
         terminator = where + SDL_strlen(extension);
-        if (where == start || *(where - 1) == ' ')
+        if (where == extensions || *(where - 1) == ' ')
             if (*terminator == ' ' || *terminator == '\0')
                 return SDL_TRUE;
 
@@ -2918,6 +2921,8 @@ SDL_GL_ExtensionSupported(const char *extension)
 void
 SDL_GL_DeduceMaxSupportedESProfile(int* major, int* minor)
 {
+/* This function breaks games because OpenGL functions are being called before a context is current - see bug 3725 */
+#if 0
 #if SDL_VIDEO_OPENGL || SDL_VIDEO_OPENGL_ES || SDL_VIDEO_OPENGL_ES2
 	/* XXX This is fragile; it will break in the event of release of
 	 * new versions of OpenGL ES.
@@ -2936,6 +2941,10 @@ SDL_GL_DeduceMaxSupportedESProfile(int* major, int* minor)
         *minor = 0;
     }
 #endif
+#else
+        *major = 2;
+        *minor = 0;
+#endif /* 0 */
 }
 
 void
@@ -3118,8 +3127,16 @@ SDL_GL_GetAttribute(SDL_GLattr attr, int *value)
     GLenum attachmentattrib = 0;
 #endif
 
+    if (!value) {
+        return SDL_InvalidParamError("value");
+    }
+
     /* Clear value in any case */
     *value = 0;
+
+    if (!_this) {
+        return SDL_UninitializedVideo();
+    }
 
     switch (attr) {
     case SDL_GL_RED_SIZE:
