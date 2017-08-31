@@ -20,8 +20,8 @@
 */
 #include "../../SDL_internal.h"
 
-#ifndef _SDL_windowswindow_h
-#define _SDL_windowswindow_h
+#ifndef SDL_windowswindow_h_
+#define SDL_windowswindow_h_
 
 #if SDL_VIDEO_OPENGL_EGL   
 #include "../SDL_egl_c.h"
@@ -85,6 +85,6 @@ extern void WIN_VirtualToPhysical_ScreenPoint(int *x, int *y, int widthHint, int
 extern void WIN_PhysicalToVirtual_ScreenPoint(int *x, int *y, int widthHint, int heightHint);
 extern void WIN_AdjustRect(const SDL_Window *window, LPRECT rect);
 
-#endif /* _SDL_windowswindow_h */
+#endif /* SDL_windowswindow_h_ */
 
 /* vi: set ts=4 sw=4 expandtab: */

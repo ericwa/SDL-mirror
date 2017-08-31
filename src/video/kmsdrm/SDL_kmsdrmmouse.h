@@ -19,12 +19,12 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
-#ifndef _SDL_KMSDRM_mouse_h
-#define _SDL_KMSDRM_mouse_h
+#include "../../SDL_internal.h"
+
+#ifndef SDL_KMSDRM_mouse_h_
+#define SDL_KMSDRM_mouse_h_
 
 #include <gbm.h>
-
-#include "../SDL_sysvideo.h"
 
 typedef struct _KMSDRM_CursorData
 {
@@ -37,6 +37,6 @@ typedef struct _KMSDRM_CursorData
 extern void KMSDRM_InitMouse(_THIS);
 extern void KMSDRM_QuitMouse(_THIS);
 
-#endif /* _SDL_KMSDRM_mouse_h */
+#endif /* SDL_KMSDRM_mouse_h_ */
 
 /* vi: set ts=4 sw=4 expandtab: */

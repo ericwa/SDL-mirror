@@ -25,10 +25,7 @@
 
 /* SDL internals */
 #include "../SDL_sysvideo.h"
-#include "SDL_version.h"
 #include "SDL_syswm.h"
-#include "SDL_loadso.h"
-#include "SDL_events.h"
 #include "SDL_log.h"
 #include "../../events/SDL_mouse_c.h"
 #include "../../events/SDL_keyboard_c.h"
@@ -39,7 +36,7 @@
 
 /* KMS/DRM declarations */
 #include "SDL_kmsdrmvideo.h"
-#include "SDL_kmsdrmevents_c.h"
+#include "SDL_kmsdrmevents.h"
 #include "SDL_kmsdrmopengles.h"
 #include "SDL_kmsdrmmouse.h"
 #include "SDL_kmsdrmdyn.h"
@@ -123,8 +120,8 @@ KMSDRM_Create(int devindex)
     device->VideoQuit = KMSDRM_VideoQuit;
     device->GetDisplayModes = KMSDRM_GetDisplayModes;
     device->SetDisplayMode = KMSDRM_SetDisplayMode;
-    device->CreateWindow = KMSDRM_CreateWindow;
-    device->CreateWindowFrom = KMSDRM_CreateWindowFrom;
+    device->CreateSDLWindow = KMSDRM_CreateWindow;
+    device->CreateSDLWindowFrom = KMSDRM_CreateWindowFrom;
     device->SetWindowTitle = KMSDRM_SetWindowTitle;
     device->SetWindowIcon = KMSDRM_SetWindowIcon;
     device->SetWindowPosition = KMSDRM_SetWindowPosition;

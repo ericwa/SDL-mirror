@@ -168,13 +168,13 @@ SDL_LoadVIDPIDListFromHint(const char *hint, SDL_vidpid_list *list)
     }
 }
 
-static void
+static void SDLCALL
 SDL_GameControllerIgnoreDevicesChanged(void *userdata, const char *name, const char *oldValue, const char *hint)
 {
     SDL_LoadVIDPIDListFromHint(hint, &SDL_ignored_controllers);
 }
 
-static void
+static void SDLCALL
 SDL_GameControllerIgnoreDevicesExceptChanged(void *userdata, const char *name, const char *oldValue, const char *hint)
 {
     SDL_LoadVIDPIDListFromHint(hint, &SDL_allowed_controllers);
@@ -333,7 +333,7 @@ static void HandleJoystickHat(SDL_GameController *gamecontroller, int hat, Uint8
 /*
  * Event filter to fire controller events from joystick ones
  */
-static int SDL_GameControllerEventWatcher(void *userdata, SDL_Event * event)
+static int SDLCALL SDL_GameControllerEventWatcher(void *userdata, SDL_Event * event)
 {
     switch(event->type) {
     case SDL_JOYAXISMOTION:
@@ -892,7 +892,7 @@ static ControllerMapping_t *SDL_PrivateGetControllerMappingForNameAndGUID(const 
 #endif /* __LINUX__ */
 
     if (!mapping && name) {
-        if (SDL_strstr(name, "Xbox") || SDL_strstr(name, "X-Box")) {
+        if (SDL_strstr(name, "Xbox") || SDL_strstr(name, "X-Box") || SDL_strstr(name, "XBOX")) {
             mapping = s_pXInputMapping;
         }
     }

@@ -40,7 +40,7 @@
 #endif
 
 #if TARGET_OS_TV
-static void
+static void SDLCALL
 SDL_AppleTVControllerUIHintChanged(void *userdata, const char *name, const char *oldValue, const char *hint)
 {
     @autoreleasepool {
@@ -293,8 +293,9 @@ SDL_AppleTVControllerUIHintChanged(void *userdata, const char *name, const char 
 
 - (void)keyboardWillHide:(NSNotification *)notification
 {
-    if (!rotatingOrientation)
+    if (!rotatingOrientation) {
         SDL_StopTextInput();
+    }
     [self setKeyboardHeight:0];
 }
 

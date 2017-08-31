@@ -854,6 +854,7 @@ enable_video_opengl
 enable_video_opengles
 enable_video_opengles1
 enable_video_opengles2
+enable_video_vulkan
 enable_libudev
 enable_dbus
 enable_ime
@@ -1603,6 +1604,7 @@ Optional Features:
                           include OpenGL ES 1.1 support [[default=yes]]
   --enable-video-opengles2
                           include OpenGL ES 2.0 support [[default=yes]]
+  --enable-video-vulkan   include Vulkan support [[default=yes]]
   --enable-libudev        enable libudev support [[default=yes]]
   --enable-dbus           enable D-Bus support [[default=yes]]
   --enable-ime            enable IME support [[default=yes]]
@@ -2706,9 +2708,9 @@ orig_CFLAGS="$CFLAGS"
 #
 SDL_MAJOR_VERSION=2
 SDL_MINOR_VERSION=0
-SDL_MICRO_VERSION=5
+SDL_MICRO_VERSION=6
 SDL_INTERFACE_AGE=0
-SDL_BINARY_AGE=5
+SDL_BINARY_AGE=6
 SDL_VERSION=$SDL_MAJOR_VERSION.$SDL_MINOR_VERSION.$SDL_MICRO_VERSION
 
 
@@ -15675,7 +15677,7 @@ case "$host" in
         ;;
 esac
 
-INCLUDE="-I$srcdir/include"
+INCLUDE="-I$srcdir/include -idirafter $srcdir/src/video/khronos"
 if test x$srcdir != x.; then
     INCLUDE="-Iinclude $INCLUDE"
 elif test -d .hg; then
@@ -16167,7 +16169,7 @@ $as_echo "#define STDC_HEADERS 1" >>confdefs.h
 
 fi
 
-    for ac_header in sys/types.h stdio.h stdlib.h stddef.h stdarg.h malloc.h memory.h string.h strings.h inttypes.h stdint.h ctype.h math.h iconv.h signal.h
+    for ac_header in sys/types.h stdio.h stdlib.h stddef.h stdarg.h malloc.h memory.h string.h strings.h wchar.h inttypes.h stdint.h ctype.h math.h iconv.h signal.h
 do :
   as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
 ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
@@ -16631,7 +16633,7 @@ fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 fi
 
-    for ac_func in malloc calloc realloc free getenv setenv putenv unsetenv qsort abs bcopy memset memcpy memmove strlen strlcpy strlcat strdup _strrev _strupr _strlwr strchr strrchr strstr itoa _ltoa _uitoa _ultoa strtol strtoul _i64toa _ui64toa strtoll strtoull atoi atof strcmp strncmp _stricmp strcasecmp _strnicmp strncasecmp vsscanf vsnprintf fopen64 fseeko fseeko64 sigaction setjmp nanosleep sysconf sysctlbyname getauxval
+    for ac_func in malloc calloc realloc free getenv setenv putenv unsetenv qsort abs bcopy memset memcpy memmove wcslen wcscmp strlen strlcpy strlcat strdup _strrev _strupr _strlwr strchr strrchr strstr itoa _ltoa _uitoa _ultoa strtol strtoul _i64toa _ui64toa strtoll strtoull atoi atof strcmp strncmp _stricmp strcasecmp _strnicmp strncasecmp vsscanf vsnprintf fopen64 fseeko fseeko64 sigaction setjmp nanosleep sysconf sysctlbyname getauxval poll
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
 ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
@@ -21891,6 +21893,97 @@ $as_echo "#define SDL_VIDEO_RENDER_OGL_ES2 1" >>confdefs.h
     fi
 }
 
+# Check whether --enable-video-vulkan was given.
+if test "${enable_video_vulkan+set}" = set; then :
+  enableval=$enable_video_vulkan;
+else
+  enable_video_vulkan=yes
+fi
+
+
+CheckVulkan()
+{
+    if test x$enable_video = xyes -a x$enable_video_vulkan = xyes; then
+        case "$host" in
+            *-*-androideabi*)
+                cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+                  #if defined(__ARM_ARCH) && __ARM_ARCH < 7
+                  #error Vulkan doesn't work on this configuration
+                  #endif
+
+int
+main ()
+{
+
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+
+
+else
+
+                    enable_video_vulkan=no
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+                ;;
+            *-*-darwin*)
+                save_CFLAGS="$CFLAGS"
+                                CFLAGS="$CFLAGS -x objective-c"
+                cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+                  #include <Cocoa/Cocoa.h>
+                  #include <Metal/Metal.h>
+                  #include <QuartzCore/CAMetalLayer.h>
+
+                  #if !TARGET_CPU_X86_64
+                  #error Vulkan doesn't work on this configuration
+                  #endif
+
+int
+main ()
+{
+
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+
+
+else
+
+                    enable_video_vulkan=no
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+                CFLAGS="$save_CFLAGS"
+                ;;
+            *)
+                ;;
+        esac
+        if test x$enable_video_vulkan = xno; then
+            # For reasons I am totally unable to see, I get an undefined macro error if
+            # I put this in the AC_TRY_COMPILE.
+            { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Vulkan does not work on this configuration." >&5
+$as_echo "$as_me: WARNING: Vulkan does not work on this configuration." >&2;}
+        fi
+    fi
+    if test x$enable_video_vulkan = xyes; then
+
+$as_echo "#define SDL_VIDEO_VULKAN 1" >>confdefs.h
+
+        SUMMARY_video="${SUMMARY_video} vulkan"
+    fi
+}
+
 CheckInputEvents()
 {
             { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Linux 2.4 unified input interface" >&5
@@ -22834,6 +22927,20 @@ if test "x$ac_cv_header_xinput_h" = xyes; then :
 fi
 
 
+        ac_fn_c_check_header_mongrel "$LINENO" "mmdeviceapi.h" "ac_cv_header_mmdeviceapi_h" "$ac_includes_default"
+if test "x$ac_cv_header_mmdeviceapi_h" = xyes; then :
+  have_wasapi=yes
+fi
+
+
+        ac_fn_c_check_header_mongrel "$LINENO" "audioclient.h" "ac_cv_header_audioclient_h" "$ac_includes_default"
+if test "x$ac_cv_header_audioclient_h" = xyes; then :
+
+else
+  have_wasapi=no
+fi
+
+
         cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -23557,6 +23664,7 @@ case "$host" in
                 SDL_CFLAGS="$SDL_CFLAGS $ANDROID_CFLAGS"
                 EXTRA_CFLAGS="$EXTRA_CFLAGS $ANDROID_CFLAGS"
                 EXTRA_LDFLAGS="$EXTRA_LDFLAGS -ldl -lGLESv1_CM -lGLESv2 -llog -landroid"
+                SDLMAIN_SOURCES="$srcdir/src/main/android/*.c"
 
                 if test x$enable_video = xyes; then
                     SOURCES="$SOURCES $srcdir/src/core/android/*.c $srcdir/src/video/android/*.c"
@@ -23621,6 +23729,7 @@ case "$host" in
         CheckKMSDRM
         CheckOpenGLX11
         CheckOpenGLESX11
+        CheckVulkan
         CheckMir
         CheckWayland
         CheckLibUDev
@@ -23769,6 +23878,8 @@ $as_echo "#define SDL_TIMER_UNIX 1" >>confdefs.h
         if test x$use_input_events = xyes; then
             SOURCES="$SOURCES $srcdir/src/core/linux/SDL_evdev*.c"
         fi
+        # Set up other core UNIX files
+        SOURCES="$SOURCES $srcdir/src/core/unix/*.c"
         ;;
     *-*-cygwin* | *-*-mingw32*)
         ARCH=win32
@@ -23788,6 +23899,7 @@ $as_echo "#define SDL_TIMER_UNIX 1" >>confdefs.h
         CheckWINDOWS
         CheckWINDOWSGL
         CheckWINDOWSGLES
+        CheckVulkan
         CheckDIRECTX
 
         # Set up the core platform files
@@ -23835,6 +23947,12 @@ $as_echo "#define SDL_AUDIO_DRIVER_DSOUND 1" >>confdefs.h
 $as_echo "#define SDL_AUDIO_DRIVER_XAUDIO2 1" >>confdefs.h
 
                 SOURCES="$SOURCES $srcdir/src/audio/xaudio2/*.c"
+            fi
+            if test x$have_wasapi = xyes; then
+
+$as_echo "#define SDL_AUDIO_DRIVER_WASAPI 1" >>confdefs.h
+
+                SOURCES="$SOURCES $srcdir/src/audio/wasapi/*.c"
             fi
             have_audio=yes
         fi
@@ -24068,6 +24186,7 @@ fi
         CheckDummyAudio
         CheckDLOPEN
         CheckPTHREAD
+        CheckVulkan
 
         # Set up files for the audio library
         if test x$enable_audio = xyes; then
@@ -24120,6 +24239,8 @@ $as_echo "#define SDL_TIMER_UNIX 1" >>confdefs.h
             SOURCES="$SOURCES $srcdir/src/timer/unix/*.c"
             have_timers=yes
         fi
+        # Set up other core UNIX files
+        SOURCES="$SOURCES $srcdir/src/core/unix/*.c"
         # The iOS platform requires special setup.
 
 $as_echo "#define SDL_VIDEO_DRIVER_UIKIT 1" >>confdefs.h
@@ -24137,7 +24258,6 @@ $as_echo "#define SDL_VIDEO_RENDER_OGL_ES 1" >>confdefs.h
 $as_echo "#define SDL_VIDEO_RENDER_OGL_ES2 1" >>confdefs.h
 
         SOURCES="$SOURCES $srcdir/src/video/uikit/*.m"
-        EXTRA_CFLAGS="$EXTRA_CFLAGS -fpascal-strings"
         EXTRA_LDFLAGS="$EXTRA_LDFLAGS -lm -liconv -lobjc"
         EXTRA_LDFLAGS="$EXTRA_LDFLAGS -Wl,-framework,AVFoundation"
         EXTRA_LDFLAGS="$EXTRA_LDFLAGS -Wl,-framework,AudioToolbox"
@@ -24170,6 +24290,7 @@ $as_echo "#define SDL_VIDEO_RENDER_OGL_ES2 1" >>confdefs.h
         CheckX11
         CheckMacGL
         CheckOpenGLX11
+        CheckVulkan
         CheckPTHREAD
 
         # Set up files for the audio library
@@ -24227,8 +24348,9 @@ $as_echo "#define SDL_TIMER_UNIX 1" >>confdefs.h
         if test x$enable_file = xyes; then
             SOURCES="$SOURCES $srcdir/src/file/cocoa/*.m"
         fi
+        # Set up other core UNIX files
+        SOURCES="$SOURCES $srcdir/src/core/unix/*.c"
         # The Mac OS X platform requires special setup.
-        EXTRA_CFLAGS="$EXTRA_CFLAGS -fpascal-strings"
         EXTRA_LDFLAGS="$EXTRA_LDFLAGS -lobjc"
         EXTRA_LDFLAGS="$EXTRA_LDFLAGS -Wl,-framework,CoreVideo"
         EXTRA_LDFLAGS="$EXTRA_LDFLAGS -Wl,-framework,Cocoa"

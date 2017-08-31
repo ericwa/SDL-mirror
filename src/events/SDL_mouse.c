@@ -27,7 +27,6 @@
 #include "SDL_timer.h"
 #include "SDL_events.h"
 #include "SDL_events_c.h"
-#include "default_cursor.h"
 #include "../video/SDL_sysvideo.h"
 
 /* #define DEBUG_MOUSE */
@@ -40,7 +39,7 @@ static int SDL_double_click_radius = 1;
 static int
 SDL_PrivateSendMouseMotion(SDL_Window * window, SDL_MouseID mouseID, int relative, int x, int y);
 
-static void
+static void SDLCALL
 SDL_MouseNormalSpeedScaleChanged(void *userdata, const char *name, const char *oldValue, const char *hint)
 {
     SDL_Mouse *mouse = (SDL_Mouse *)userdata;
@@ -52,7 +51,7 @@ SDL_MouseNormalSpeedScaleChanged(void *userdata, const char *name, const char *o
     }
 }
 
-static void
+static void SDLCALL
 SDL_MouseRelativeSpeedScaleChanged(void *userdata, const char *name, const char *oldValue, const char *hint)
 {
     SDL_Mouse *mouse = (SDL_Mouse *)userdata;
@@ -64,7 +63,7 @@ SDL_MouseRelativeSpeedScaleChanged(void *userdata, const char *name, const char 
     }
 }
 
-static void
+static void SDLCALL
 SDL_TouchMouseEventsChanged(void *userdata, const char *name, const char *oldValue, const char *hint)
 {
     SDL_Mouse *mouse = (SDL_Mouse *)userdata;
@@ -508,10 +507,11 @@ SDL_SendMouseButton(SDL_Window * window, SDL_MouseID mouseID, Uint8 state, Uint8
 }
 
 int
-SDL_SendMouseWheel(SDL_Window * window, SDL_MouseID mouseID, int x, int y, SDL_MouseWheelDirection direction)
+SDL_SendMouseWheel(SDL_Window * window, SDL_MouseID mouseID, float x, float y, SDL_MouseWheelDirection direction)
 {
     SDL_Mouse *mouse = SDL_GetMouse();
     int posted;
+    int integral_x, integral_y;
 
     if (window) {
         SDL_SetMouseFocus(window);
@@ -521,6 +521,26 @@ SDL_SendMouseWheel(SDL_Window * window, SDL_MouseID mouseID, int x, int y, SDL_M
         return 0;
     }
 
+    mouse->accumulated_wheel_x += x;
+    if (mouse->accumulated_wheel_x > 0) {
+        integral_x = (int)SDL_floor(mouse->accumulated_wheel_x);
+    } else if (mouse->accumulated_wheel_x < 0) {
+        integral_x = (int)SDL_ceil(mouse->accumulated_wheel_x);
+    } else {
+        integral_x = 0;
+    }
+    mouse->accumulated_wheel_x -= integral_x;
+
+    mouse->accumulated_wheel_y += y;
+    if (mouse->accumulated_wheel_y > 0) {
+        integral_y = (int)SDL_floor(mouse->accumulated_wheel_y);
+    } else if (mouse->accumulated_wheel_y < 0) {
+        integral_y = (int)SDL_ceil(mouse->accumulated_wheel_y);
+    } else {
+        integral_y = 0;
+    }
+    mouse->accumulated_wheel_y -= integral_y;
+
     /* Post the event, if desired */
     posted = 0;
     if (SDL_GetEventState(SDL_MOUSEWHEEL) == SDL_ENABLE) {
@@ -528,8 +548,12 @@ SDL_SendMouseWheel(SDL_Window * window, SDL_MouseID mouseID, int x, int y, SDL_M
         event.type = SDL_MOUSEWHEEL;
         event.wheel.windowID = mouse->focus ? mouse->focus->id : 0;
         event.wheel.which = mouseID;
-        event.wheel.x = x;
-        event.wheel.y = y;
+#if 0 /* Uncomment this when it goes in for SDL 2.1 */
+        event.wheel.preciseX = x;
+        event.wheel.preciseY = y;
+#endif
+        event.wheel.x = integral_x;
+        event.wheel.y = integral_y;
         event.wheel.direction = (Uint32)direction;
         posted = (SDL_PushEvent(&event) > 0);
     }

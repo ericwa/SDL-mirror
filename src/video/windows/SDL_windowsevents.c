@@ -28,6 +28,7 @@
 #include "SDL_syswm.h"
 #include "SDL_timer.h"
 #include "SDL_vkeys.h"
+#include "SDL_hints.h"
 #include "../../events/SDL_events_c.h"
 #include "../../events/SDL_touch_c.h"
 #include "../../events/scancodes_windows.h"
@@ -463,11 +464,11 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 if (SDL_GetKeyboardFocus() != data->window) {
                     SDL_SetKeyboardFocus(data->window);
                 }
-                
+
                 GetCursorPos(&cursorPos);
                 ScreenToClient(hwnd, &cursorPos);
                 SDL_SendMouseMotion(data->window, 0, 0, cursorPos.x, cursorPos.y);
-                
+
                 WIN_CheckAsyncMouseRelease(data);
 
                 /*
@@ -594,40 +595,14 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         break;
 
     case WM_MOUSEWHEEL:
-        {
-            static short s_AccumulatedMotion;
-
-            s_AccumulatedMotion += GET_WHEEL_DELTA_WPARAM(wParam);
-            if (s_AccumulatedMotion > 0) {
-                while (s_AccumulatedMotion >= WHEEL_DELTA) {
-                    SDL_SendMouseWheel(data->window, 0, 0, 1, SDL_MOUSEWHEEL_NORMAL);
-                    s_AccumulatedMotion -= WHEEL_DELTA;
-                }
-            } else {
-                while (s_AccumulatedMotion <= -WHEEL_DELTA) {
-                    SDL_SendMouseWheel(data->window, 0, 0, -1, SDL_MOUSEWHEEL_NORMAL);
-                    s_AccumulatedMotion += WHEEL_DELTA;
-                }
-            }
-        }
-        break;
-
     case WM_MOUSEHWHEEL:
         {
-            static short s_AccumulatedMotion;
-
-            s_AccumulatedMotion += GET_WHEEL_DELTA_WPARAM(wParam);
-            if (s_AccumulatedMotion > 0) {
-                while (s_AccumulatedMotion >= WHEEL_DELTA) {
-                    SDL_SendMouseWheel(data->window, 0, 1, 0, SDL_MOUSEWHEEL_NORMAL);
-                    s_AccumulatedMotion -= WHEEL_DELTA;
-                }
-            } else {
-                while (s_AccumulatedMotion <= -WHEEL_DELTA) {
-                    SDL_SendMouseWheel(data->window, 0, -1, 0, SDL_MOUSEWHEEL_NORMAL);
-                    s_AccumulatedMotion += WHEEL_DELTA;
-                }
-            }
+            short amount = GET_WHEEL_DELTA_WPARAM(wParam);
+            float fAmount = (float) amount / WHEEL_DELTA;
+            if (msg == WM_MOUSEWHEEL)
+                SDL_SendMouseWheel(data->window, 0, 0.0f, fAmount, SDL_MOUSEWHEEL_NORMAL);
+            else
+                SDL_SendMouseWheel(data->window, 0, fAmount, 0.0f, SDL_MOUSEWHEEL_NORMAL);
         }
         break;
 
@@ -664,7 +639,7 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 SDL_SendKeyboardKey(SDL_PRESSED, code);
             }
         }
- 
+
         returnCode = 0;
         break;
 
@@ -818,7 +793,7 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             RECT rect;
             int x, y;
             int w, h;
-            
+
             if (data->initializing || data->in_border_change) {
                 break;
             }
@@ -1162,6 +1137,7 @@ HINSTANCE SDL_Instance = NULL;
 int
 SDL_RegisterApp(char *name, Uint32 style, void *hInst)
 {
+    const char *hint;
     WNDCLASSEX wcex;
     TCHAR path[MAX_PATH];
 
@@ -1198,9 +1174,19 @@ SDL_RegisterApp(char *name, Uint32 style, void *hInst)
     wcex.cbClsExtra     = 0;
     wcex.cbWndExtra     = 0;
 
-    /* Use the first icon as a default icon, like in the Explorer */
-    GetModuleFileName(SDL_Instance, path, MAX_PATH);
-    ExtractIconEx(path, 0, &wcex.hIcon, &wcex.hIconSm, 1);
+    hint = SDL_GetHint(SDL_HINT_WINDOWS_INTRESOURCE_ICON);
+    if (hint && *hint) {
+        wcex.hIcon = LoadIcon(SDL_Instance, MAKEINTRESOURCE(SDL_atoi(hint)));
+
+        hint = SDL_GetHint(SDL_HINT_WINDOWS_INTRESOURCE_ICON_SMALL);
+        if (hint && *hint) {
+            wcex.hIconSm = LoadIcon(SDL_Instance, MAKEINTRESOURCE(SDL_atoi(hint)));
+        }
+    } else {
+        /* Use the first icon as a default icon, like in the Explorer */
+        GetModuleFileName(SDL_Instance, path, MAX_PATH);
+        ExtractIconEx(path, 0, &wcex.hIcon, &wcex.hIconSm, 1);
+    }
 
     if (!RegisterClassEx(&wcex)) {
         return SDL_SetError("Couldn't register application class");

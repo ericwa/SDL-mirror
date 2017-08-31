@@ -126,6 +126,7 @@ static SDL_Renderer *D3D_CreateRenderer(SDL_Window * window, Uint32 flags);
 static void D3D_WindowEvent(SDL_Renderer * renderer,
                             const SDL_WindowEvent *event);
 static int D3D_GetOutputSize(SDL_Renderer * renderer, int *w, int *h);
+static SDL_bool D3D_SupportsBlendMode(SDL_Renderer * renderer, SDL_BlendMode blendMode);
 static int D3D_CreateTexture(SDL_Renderer * renderer, SDL_Texture * texture);
 static int D3D_RecreateTexture(SDL_Renderer * renderer, SDL_Texture * texture);
 static int D3D_UpdateTexture(SDL_Renderer * renderer, SDL_Texture * texture,
@@ -543,6 +544,7 @@ D3D_CreateRenderer(SDL_Window * window, Uint32 flags)
 
     renderer->WindowEvent = D3D_WindowEvent;
     renderer->GetOutputSize = D3D_GetOutputSize;
+    renderer->SupportsBlendMode = D3D_SupportsBlendMode;
     renderer->CreateTexture = D3D_CreateTexture;
     renderer->UpdateTexture = D3D_UpdateTexture;
     renderer->UpdateTextureYUV = D3D_UpdateTextureYUV;
@@ -760,6 +762,7 @@ D3D_CreateRenderer(SDL_Window * window, Uint32 flags)
             const char *error = (const char *)pErrorMsgs->lpVtbl->GetBufferPointer(pErrorMsgs);
             SDL_SetError("Couldn't assemble shader: %s", error);
         }
+        if (shader_data != NULL)
 #else
         const DWORD shader_data[] = {
             0xffff0200, 0x05000051, 0xa00f0000, 0xbd808081, 0xbf008081, 0xbf008081,
@@ -779,7 +782,7 @@ D3D_CreateRenderer(SDL_Window * window, Uint32 flags)
             0x80e40000, 0x0000ffff
         };
 #endif
-        if (shader_data != NULL) {
+        {
             result = IDirect3DDevice9_CreatePixelShader(data->device, shader_data, &data->ps_yuv);
             if (!FAILED(result)) {
                 renderer->info.texture_formats[renderer->info.num_texture_formats++] = SDL_PIXELFORMAT_YV12;
@@ -808,6 +811,58 @@ D3D_GetOutputSize(SDL_Renderer * renderer, int *w, int *h)
 {
     WIN_GetDrawableSize(renderer->window, w, h);
     return 0;
+}
+
+static D3DBLEND GetBlendFunc(SDL_BlendFactor factor)
+{
+    switch (factor) {
+    case SDL_BLENDFACTOR_ZERO:
+        return D3DBLEND_ZERO;
+    case SDL_BLENDFACTOR_ONE:
+        return D3DBLEND_ONE;
+    case SDL_BLENDFACTOR_SRC_COLOR:
+        return D3DBLEND_SRCCOLOR;
+    case SDL_BLENDFACTOR_ONE_MINUS_SRC_COLOR:
+        return D3DBLEND_INVSRCCOLOR;
+    case SDL_BLENDFACTOR_SRC_ALPHA:
+        return D3DBLEND_SRCALPHA;
+    case SDL_BLENDFACTOR_ONE_MINUS_SRC_ALPHA:
+        return D3DBLEND_INVSRCALPHA;
+    case SDL_BLENDFACTOR_DST_COLOR:
+        return D3DBLEND_DESTCOLOR;
+    case SDL_BLENDFACTOR_ONE_MINUS_DST_COLOR:
+        return D3DBLEND_INVDESTCOLOR;
+    case SDL_BLENDFACTOR_DST_ALPHA:
+        return D3DBLEND_DESTALPHA;
+    case SDL_BLENDFACTOR_ONE_MINUS_DST_ALPHA:
+        return D3DBLEND_INVDESTALPHA;
+    default:
+        return (D3DBLEND)0;
+    }
+}
+
+static SDL_bool
+D3D_SupportsBlendMode(SDL_Renderer * renderer, SDL_BlendMode blendMode)
+{
+    D3D_RenderData *data = (D3D_RenderData *) renderer->driverdata;
+    SDL_BlendFactor srcColorFactor = SDL_GetBlendModeSrcColorFactor(blendMode);
+    SDL_BlendFactor srcAlphaFactor = SDL_GetBlendModeSrcAlphaFactor(blendMode);
+    SDL_BlendOperation colorOperation = SDL_GetBlendModeColorOperation(blendMode);
+    SDL_BlendFactor dstColorFactor = SDL_GetBlendModeDstColorFactor(blendMode);
+    SDL_BlendFactor dstAlphaFactor = SDL_GetBlendModeDstAlphaFactor(blendMode);
+    SDL_BlendOperation alphaOperation = SDL_GetBlendModeAlphaOperation(blendMode);
+
+    if (!GetBlendFunc(srcColorFactor) || !GetBlendFunc(srcAlphaFactor) ||
+        !GetBlendFunc(dstColorFactor) || !GetBlendFunc(dstAlphaFactor)) {
+        return SDL_FALSE;
+    }
+    if ((srcColorFactor != srcAlphaFactor || dstColorFactor != dstAlphaFactor) && !data->enableSeparateAlphaBlend) {
+        return SDL_FALSE;
+    }
+    if (colorOperation != SDL_BLENDOPERATION_ADD || alphaOperation != SDL_BLENDOPERATION_ADD) {
+        return SDL_FALSE;
+    }
+    return SDL_TRUE;
 }
 
 static D3DTEXTUREFILTERTYPE
@@ -1361,55 +1416,22 @@ D3D_RenderClear(SDL_Renderer * renderer)
 }
 
 static void
-D3D_SetBlendMode(D3D_RenderData * data, int blendMode)
+D3D_SetBlendMode(D3D_RenderData * data, SDL_BlendMode blendMode)
 {
-    switch (blendMode) {
-    case SDL_BLENDMODE_NONE:
-        IDirect3DDevice9_SetRenderState(data->device, D3DRS_ALPHABLENDENABLE,
-                                        FALSE);
-        break;
-    case SDL_BLENDMODE_BLEND:
-        IDirect3DDevice9_SetRenderState(data->device, D3DRS_ALPHABLENDENABLE,
-                                        TRUE);
+    if (blendMode == SDL_BLENDMODE_NONE) {
+        IDirect3DDevice9_SetRenderState(data->device, D3DRS_ALPHABLENDENABLE, FALSE);
+    } else {
+        IDirect3DDevice9_SetRenderState(data->device, D3DRS_ALPHABLENDENABLE, TRUE);
         IDirect3DDevice9_SetRenderState(data->device, D3DRS_SRCBLEND,
-                                        D3DBLEND_SRCALPHA);
+                                        GetBlendFunc(SDL_GetBlendModeSrcColorFactor(blendMode)));
         IDirect3DDevice9_SetRenderState(data->device, D3DRS_DESTBLEND,
-                                        D3DBLEND_INVSRCALPHA);
+                                        GetBlendFunc(SDL_GetBlendModeDstColorFactor(blendMode)));
         if (data->enableSeparateAlphaBlend) {
             IDirect3DDevice9_SetRenderState(data->device, D3DRS_SRCBLENDALPHA,
-                                            D3DBLEND_ONE);
+                                            GetBlendFunc(SDL_GetBlendModeSrcAlphaFactor(blendMode)));
             IDirect3DDevice9_SetRenderState(data->device, D3DRS_DESTBLENDALPHA,
-                                            D3DBLEND_INVSRCALPHA);
+                                            GetBlendFunc(SDL_GetBlendModeDstAlphaFactor(blendMode)));
         }
-        break;
-    case SDL_BLENDMODE_ADD:
-        IDirect3DDevice9_SetRenderState(data->device, D3DRS_ALPHABLENDENABLE,
-                                        TRUE);
-        IDirect3DDevice9_SetRenderState(data->device, D3DRS_SRCBLEND,
-                                        D3DBLEND_SRCALPHA);
-        IDirect3DDevice9_SetRenderState(data->device, D3DRS_DESTBLEND,
-                                        D3DBLEND_ONE);
-        if (data->enableSeparateAlphaBlend) {
-            IDirect3DDevice9_SetRenderState(data->device, D3DRS_SRCBLENDALPHA,
-                                            D3DBLEND_ZERO);
-            IDirect3DDevice9_SetRenderState(data->device, D3DRS_DESTBLENDALPHA,
-                                            D3DBLEND_ONE);
-        }
-        break;
-    case SDL_BLENDMODE_MOD:
-        IDirect3DDevice9_SetRenderState(data->device, D3DRS_ALPHABLENDENABLE,
-                                        TRUE);
-        IDirect3DDevice9_SetRenderState(data->device, D3DRS_SRCBLEND,
-                                        D3DBLEND_ZERO);
-        IDirect3DDevice9_SetRenderState(data->device, D3DRS_DESTBLEND,
-                                        D3DBLEND_SRCCOLOR);
-        if (data->enableSeparateAlphaBlend) {
-            IDirect3DDevice9_SetRenderState(data->device, D3DRS_SRCBLENDALPHA,
-                                            D3DBLEND_ZERO);
-            IDirect3DDevice9_SetRenderState(data->device, D3DRS_DESTBLENDALPHA,
-                                            D3DBLEND_ONE);
-        }
-        break;
     }
 }
 

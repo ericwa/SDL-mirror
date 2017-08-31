@@ -18,8 +18,14 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
+
+/* We won't get fseeko64 on QNX if _LARGEFILE64_SOURCE is defined, but the
+   configure script knows the C runtime has it and enables it. */
+#ifndef __QNXNTO__
 /* Need this so Linux systems define fseek64o, ftell64o and off64_t */
 #define _LARGEFILE64_SOURCE
+#endif
+
 #include "../SDL_internal.h"
 
 #if defined(__WIN32__)
@@ -680,7 +686,7 @@ SDL_LoadFile_RW(SDL_RWops * src, size_t *datasize, int freesrc)
 
     size_total = 0;
     for (;;) {
-        if ((size_total + FILE_CHUNK_SIZE) > size) {
+        if ((((Sint64)size_total) + FILE_CHUNK_SIZE) > size) {
             size = (size_total + FILE_CHUNK_SIZE);
             newdata = SDL_realloc(data, (size_t)(size + 1));
             if (!newdata) {
