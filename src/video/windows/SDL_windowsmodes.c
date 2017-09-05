@@ -33,10 +33,10 @@
 
 /* #define DEBUG_MODES */
 
-static int WIN_GetDisplayDPIInternal(_THIS, SDL_VideoDisplay * display, int * hdpi_out, int * vdpi_out);
+static int WIN_GetDisplayDPIInternal(_THIS, HMONITOR hMonitor, int * hdpi_out, int * vdpi_out);
 
 static void
-WIN_UpdateDisplayMode(_THIS, LPCTSTR deviceName, DWORD index, SDL_DisplayMode * mode)
+WIN_UpdateDisplayMode(_THIS, HMONITOR hMonitor, LPCTSTR deviceName, DWORD index, SDL_DisplayMode * mode)
 {
     SDL_DisplayModeData *data = (SDL_DisplayModeData *) mode->driverdata;
     HDC hdc;
@@ -52,9 +52,17 @@ WIN_UpdateDisplayMode(_THIS, LPCTSTR deviceName, DWORD index, SDL_DisplayMode * 
         HBITMAP hbm;
         int logical_width = GetDeviceCaps( hdc, HORZRES );
         int logical_height = GetDeviceCaps( hdc, VERTRES );
+        int hdpi, vdpi;
 
-        mode->w = logical_width;
-        mode->h = logical_height;
+        if (WIN_GetDisplayDPIInternal(_this, hMonitor, &hdpi, &vdpi) != 0) {
+            hdpi = 96;
+            vdpi = 96;
+        }
+
+        /* convert logical_width/logical_height from the Windows virtual screen
+           coordinate system to SDL points */
+        mode->w = MulDiv(logical_width, 96, hdpi);
+        mode->h = MulDiv(logical_height, 96, vdpi);
         
         SDL_zero(bmi_data);
         bmi = (LPBITMAPINFO) bmi_data;
@@ -113,7 +121,7 @@ WIN_UpdateDisplayMode(_THIS, LPCTSTR deviceName, DWORD index, SDL_DisplayMode * 
 }
 
 static SDL_bool
-WIN_GetDisplayMode(_THIS, LPCTSTR deviceName, DWORD index, SDL_DisplayMode * mode)
+WIN_GetDisplayMode(_THIS, HMONITOR hMonitor, LPCTSTR deviceName, DWORD index, SDL_DisplayMode * mode)
 {
     SDL_DisplayModeData *data;
     DEVMODE devmode;
@@ -138,7 +146,7 @@ WIN_GetDisplayMode(_THIS, LPCTSTR deviceName, DWORD index, SDL_DisplayMode * mod
     mode->refresh_rate = data->DeviceMode.dmDisplayFrequency;
 
     /* Fill in the mode information */
-    WIN_UpdateDisplayMode(_this, deviceName, index, mode);
+    WIN_UpdateDisplayMode(_this, hMonitor, deviceName, index, mode);
     return SDL_TRUE;
 }
 
@@ -154,7 +162,7 @@ WIN_AddDisplay(_THIS, HMONITOR hMonitor, const MONITORINFOEX *info)
     SDL_Log("Display: %s\n", WIN_StringToUTF8(info->szDevice));
 #endif
 
-    if (!WIN_GetDisplayMode(_this, info->szDevice, ENUM_CURRENT_SETTINGS, &mode)) {
+    if (!WIN_GetDisplayMode(_this, hMonitor, info->szDevice, ENUM_CURRENT_SETTINGS, &mode)) {
         return SDL_FALSE;
     }
 
@@ -241,7 +249,7 @@ WIN_GetDisplayBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
     BOOL rc;
     int hdpi, vdpi;
 
-    if (WIN_GetDisplayDPIInternal(_this, display, &hdpi, &vdpi) != 0) {
+    if (WIN_GetDisplayDPIInternal(_this, data->MonitorHandle, &hdpi, &vdpi) != 0) {
         return SDL_SetError("Couldn't find monitor DPI");
     }
 
@@ -275,10 +283,9 @@ Always returns something in hdpi_out and vdpi_out; 96, 96 on failure.
 Returns 0 on success.
 */
 static int
-WIN_GetDisplayDPIInternal(_THIS, SDL_VideoDisplay * display, int * hdpi_out, int * vdpi_out)
+WIN_GetDisplayDPIInternal(_THIS, HMONITOR hMonitor, int * hdpi_out, int * vdpi_out)
 {
-    const SDL_DisplayData *displaydata = (SDL_DisplayData *)display->driverdata;
-    const SDL_VideoData *videodata = (SDL_VideoData *)display->device->driverdata;
+    const SDL_VideoData *videodata = (SDL_VideoData *)_this->driverdata;
 
     *hdpi_out = 96;
     *vdpi_out = 96;
@@ -286,7 +293,7 @@ WIN_GetDisplayDPIInternal(_THIS, SDL_VideoDisplay * display, int * hdpi_out, int
     if (videodata->GetDpiForMonitor) {
         UINT hdpi_uint, vdpi_uint;
         // Windows 8.1+ codepath
-        if (videodata->GetDpiForMonitor(displaydata->MonitorHandle, MDT_EFFECTIVE_DPI, &hdpi_uint, &vdpi_uint) == S_OK) {
+        if (videodata->GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &hdpi_uint, &vdpi_uint) == S_OK) {
             // GetDpiForMonitor docs promise to return the same hdpi/vdpi
             *hdpi_out = hdpi_uint;
             *vdpi_out = vdpi_uint;
@@ -419,7 +426,7 @@ WIN_GetDisplayModes(_THIS, SDL_VideoDisplay * display)
     SDL_DisplayMode mode;
 
     for (i = 0;; ++i) {
-        if (!WIN_GetDisplayMode(_this, data->DeviceName, i, &mode)) {
+        if (!WIN_GetDisplayMode(_this, data->MonitorHandle, data->DeviceName, i, &mode)) {
             break;
         }
         if (SDL_ISPIXELFORMAT_INDEXED(mode.format)) {
@@ -468,7 +475,7 @@ WIN_SetDisplayMode(_THIS, SDL_VideoDisplay * display, SDL_DisplayMode * mode)
         return SDL_SetError("ChangeDisplaySettingsEx() failed: %s", reason);
     }
     EnumDisplaySettings(displaydata->DeviceName, ENUM_CURRENT_SETTINGS, &data->DeviceMode);
-    WIN_UpdateDisplayMode(_this, displaydata->DeviceName, ENUM_CURRENT_SETTINGS, mode);
+    WIN_UpdateDisplayMode(_this, displaydata->MonitorHandle, displaydata->DeviceName, ENUM_CURRENT_SETTINGS, mode);
     return 0;
 }
 
