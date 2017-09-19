@@ -520,6 +520,11 @@ SetWindowStyle(SDL_Window * window, NSUInteger style)
     NSRect rect = [nswindow contentRectForFrameRect:[nswindow frame]];
     ConvertNSRect([nswindow screen], fullscreen, &rect);
 
+    if (inFullscreenTransition) {
+        /* We'll take care of this at the end of the transition */
+        return;
+    }
+
     if (s_moveHack) {
         SDL_bool blockMove = ((SDL_GetTicks() - s_moveHack) < 500);
 
@@ -719,6 +724,7 @@ SetWindowStyle(SDL_Window * window, NSUInteger style)
          */
         window->w = 0;
         window->h = 0;
+        [self windowDidMove:aNotification];
         [self windowDidResize:aNotification];
     }
 }
@@ -727,13 +733,13 @@ SetWindowStyle(SDL_Window * window, NSUInteger style)
 {
     SDL_Window *window = _data->window;
 
+    isFullscreenSpace = NO;
+    inFullscreenTransition = YES;
+
     /* As of OS X 10.11, the window seems to need to be resizable when exiting
        a Space, in order for it to resize back to its windowed-mode size.
      */
     SetWindowStyle(window, GetWindowStyle(window) | NSWindowStyleMaskResizable);
-
-    isFullscreenSpace = NO;
-    inFullscreenTransition = YES;
 }
 
 - (void)windowDidFailToExitFullScreen:(NSNotification *)aNotification
@@ -781,6 +787,13 @@ SetWindowStyle(SDL_Window * window, NSUInteger style)
 
         pendingWindowOperation = PENDING_OPERATION_NONE;
 
+#if 0
+/* This fixed bug 3719, which is that changing window size while fullscreen
+   doesn't take effect when leaving fullscreen, but introduces bug 3809,
+   which is that a maximized window doesn't go back to normal size when
+   restored, so this code is disabled until we can properly handle the
+   beginning and end of maximize and restore.
+ */
         /* Restore windowed size and position in case it changed while fullscreen */
         {
             NSRect rect;
@@ -795,12 +808,14 @@ SetWindowStyle(SDL_Window * window, NSUInteger style)
             [nswindow setFrameOrigin:rect.origin];
             s_moveHack = SDL_GetTicks();
         }
+#endif /* 0 */
 
         /* Force the size change event in case it was delivered earlier
            while the window was still animating into place.
          */
         window->w = 0;
         window->h = 0;
+        [self windowDidMove:aNotification];
         [self windowDidResize:aNotification];
 
         /* FIXME: Why does the window get hidden? */

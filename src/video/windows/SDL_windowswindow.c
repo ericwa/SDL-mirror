@@ -65,10 +65,14 @@ GetWindowStyle(SDL_Window * window)
 
     if (window->flags & SDL_WINDOW_FULLSCREEN) {
         style |= STYLE_FULLSCREEN;
-    } else if (window->flags & SDL_WINDOW_BORDERLESS) {
-        style |= STYLE_BORDERLESS;
     } else {
-        style |= STYLE_NORMAL;
+        if (window->flags & SDL_WINDOW_BORDERLESS) {
+            style |= STYLE_BORDERLESS;
+        } else {
+            style |= STYLE_NORMAL;
+        }
+
+        /* You can have a borderless resizable window */
         if (window->flags & SDL_WINDOW_RESIZABLE) {
             style |= STYLE_RESIZABLE;
         }
@@ -83,8 +87,8 @@ WIN_SetWindowPositionInternal(_THIS, SDL_Window * window, UINT flags)
     HWND hwnd = data->hwnd;
     RECT rect;
     HWND top;
-    int x, y;
     int w, h;
+    int x, y;
 
     /* Figure out what the window area will be */
     if (SDL_ShouldAllowTopmost() && ((window->flags & (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_INPUT_FOCUS)) == (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_INPUT_FOCUS) || (window->flags & SDL_WINDOW_ALWAYS_ON_TOP))) {
@@ -628,10 +632,10 @@ WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, 
 {
     SDL_WindowData *data = (SDL_WindowData *) window->driverdata;
     HWND hwnd = data->hwnd;
-    RECT rect;
     SDL_Rect bounds;
     DWORD style;
     HWND top;
+    RECT rect;
     int x, y;
     int w, h;
 
