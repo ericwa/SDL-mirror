@@ -1060,6 +1060,10 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             SDL_Log("WM_DPICHANGED: calling SetWindowPos: (%d, %d), (%dx%d)\n", suggestedRect->left, suggestedRect->top, w, h);
 #endif
 
+            /* clear the window size, to cause us to send a SDL_WINDOWEVENT_RESIZED event in WM_WINDOWPOSCHANGED */
+            data->window->w = 0;
+            data->window->h = 0;
+
             data->expected_resize = SDL_TRUE;
             SetWindowPos(hwnd,
                 NULL,
@@ -1069,8 +1073,6 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 h,
                 SWP_NOZORDER | SWP_NOACTIVATE);
             data->expected_resize = SDL_FALSE;
-
-            /* FIXME: Deliver a SDL event saying the framebuffer size changed */
             return 0;
         }
         break;
