@@ -263,15 +263,8 @@ WIN_GetDisplayBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
 
     rect->x = minfo.rcMonitor.left;
     rect->y = minfo.rcMonitor.top;
-    // NOTE: For high DPI, only the width/height are scaled. This matches what Windows seems to do
-    // to monitor bounds when non-DPI aware applications ask for monitor bounds of a high DPI monitor
-    if (vid_data->highdpi_enabled) {
-        rect->w = MulDiv(minfo.rcMonitor.right - minfo.rcMonitor.left, 96, hdpi);
-        rect->h = MulDiv(minfo.rcMonitor.bottom - minfo.rcMonitor.top, 96, vdpi);
-    } else {
-        rect->w = minfo.rcMonitor.right - minfo.rcMonitor.left;
-        rect->h = minfo.rcMonitor.bottom - minfo.rcMonitor.top;
-    }
+    rect->w = minfo.rcMonitor.right - minfo.rcMonitor.left;
+    rect->h = minfo.rcMonitor.bottom - minfo.rcMonitor.top;
 
     return 0;
 }
@@ -400,20 +393,11 @@ WIN_GetDisplayUsableBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
     
     monitor = &minfo.rcMonitor;
     work = &minfo.rcWork;
-    
-    if (vid_data->highdpi_enabled) {
-        // N.B: For x/y, only the _offset_ of the work rect from the monitor's top-left corner is scaled.
-        rect->x = monitor->left + MulDiv(work->left - monitor->left, 96, hdpi);
-        rect->y = monitor->top + MulDiv(work->top - monitor->top, 96, vdpi);
-        // Width/height are scaled normally
-        rect->w = MulDiv(work->right - work->left, 96, hdpi);
-        rect->h = MulDiv(work->bottom - work->top, 96, vdpi);
-    } else {
-        rect->x = work->left;
-        rect->y = work->top;
-        rect->w = work->right - work->left;
-        rect->h = work->bottom - work->top;
-    }
+
+    rect->x = work->left;
+    rect->y = work->top;
+    rect->w = work->right - work->left;
+    rect->h = work->bottom - work->top;
 
     return 0;
 }
