@@ -1004,9 +1004,16 @@ void
 WIN_GetDrawableSize(const SDL_Window *window, int *w, int *h)
 {
     const SDL_WindowData *data = ((SDL_WindowData *)window->driverdata);
+    HWND hwnd = data->hwnd;
+    RECT rect;
 
-    *w = MulDiv(window->w, data->scaling_dpi, 96);
-    *h = MulDiv(window->h, data->scaling_dpi, 96);
+    if (GetClientRect(hwnd, &rect)) {
+        *w = rect.right;
+        *h = rect.bottom;
+    } else {
+        *w = 0;
+        *h = 0;
+    }
 }
 
 void
