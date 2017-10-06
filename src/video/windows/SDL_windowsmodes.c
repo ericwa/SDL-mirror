@@ -246,7 +246,13 @@ WIN_GetDisplayBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
     const SDL_DisplayData *data = (const SDL_DisplayData *)display->driverdata;
     const SDL_VideoData *vid_data = (const SDL_VideoData *)_this->driverdata;
     MONITORINFO minfo;
+    RECT rectScaled;
     BOOL rc;
+    int hdpi, vdpi;
+
+    if (WIN_GetDisplayDPIInternal(_this, data->MonitorHandle, &hdpi, &vdpi) != 0) {
+        return SDL_SetError("Couldn't find monitor DPI");
+    }
 
     SDL_zero(minfo);
     minfo.cbSize = sizeof(MONITORINFO);
@@ -256,12 +262,12 @@ WIN_GetDisplayBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
         return SDL_SetError("Couldn't find monitor data");
     }
 
-    WIN_RectToDPIUnaware(_this, &minfo.rcMonitor);
+    WIN_RectToDPIUnaware(_this, minfo.rcMonitor, &rectScaled);
 
-    rect->x = minfo.rcMonitor.left;
-    rect->y = minfo.rcMonitor.top;
-    rect->w = minfo.rcMonitor.right - minfo.rcMonitor.left;
-    rect->h = minfo.rcMonitor.bottom - minfo.rcMonitor.top;
+    rect->x = rectScaled.left;
+    rect->y = rectScaled.top;
+    rect->w = rectScaled.right - rectScaled.left;
+    rect->h = rectScaled.bottom - rectScaled.top;
 
     return 0;
 }
@@ -372,6 +378,14 @@ WIN_GetDisplayUsableBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
     const SDL_VideoData *vid_data = (const SDL_VideoData *)_this->driverdata;
     MONITORINFO minfo;
     BOOL rc;
+    LPRECT monitor;
+    LPRECT work;
+    RECT workScaled;
+    int hdpi, vdpi;
+
+    if (WIN_GetDisplayDPIInternal(_this, display, &hdpi, &vdpi) != 0) {
+        return SDL_SetError("Couldn't find monitor DPI");
+    }
 
     SDL_zero(minfo);
     minfo.cbSize = sizeof(MONITORINFO);
@@ -381,12 +395,15 @@ WIN_GetDisplayUsableBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
         return SDL_SetError("Couldn't find monitor data");
     }
     
-    WIN_RectToDPIUnaware(_this, &minfo.rcWork);
+    monitor = &minfo.rcMonitor;
+    work = &minfo.rcWork;
 
-    rect->x = minfo.rcWork.left;
-    rect->y = minfo.rcWork.top;
-    rect->w = minfo.rcWork.right - minfo.rcWork.left;
-    rect->h = minfo.rcWork.bottom - minfo.rcWork.top;
+    WIN_RectToDPIUnaware(_this, *work, &workScaled);
+
+    rect->x = workScaled.left;
+    rect->y = workScaled.top;
+    rect->w = workScaled.right - workScaled.left;
+    rect->h = workScaled.bottom - workScaled.top;
 
     return 0;
 }

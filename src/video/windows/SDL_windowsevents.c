@@ -791,19 +791,38 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_WINDOWPOSCHANGED:
         {
             RECT rect;
+            POINT point;
+            int x, y;
+            int w, h;
 
             if (data->initializing || data->in_border_change) {
                 break;
             }
 
-            if (WIN_GetClientScreenRect_DPIUnaware(SDL_GetVideoDevice(), hwnd, &rect) != 0 || IsRectEmpty(&rect)) {
+            if (!GetClientRect(hwnd, &rect) || IsRectEmpty(&rect)) {
                 break;
             }
+            // NOTE: doing ClientToScreen on both corners of the rect
+            // can give bogus results if the window is stradding 2 screens
+            
+            point.x = 0;
+            point.y = 0;
+            ClientToScreen(hwnd, &point);
 
             WIN_UpdateClipCursor(data->window);
 
-            SDL_SendWindowEvent(data->window, SDL_WINDOWEVENT_MOVED, rect.left, rect.top);
-            SDL_SendWindowEvent(data->window, SDL_WINDOWEVENT_RESIZED, rect.right - rect.left, rect.bottom - rect.top);
+            x = point.x;
+            y = point.y;
+            WIN_PhysicalToVirtual_ScreenPoint(&x, &y, rect.right, rect.bottom);
+
+            SDL_SendWindowEvent(data->window, SDL_WINDOWEVENT_MOVED, x, y);
+
+            w = rect.right - rect.left;
+            h = rect.bottom - rect.top;
+            WIN_PhysicalToVirtual_ClientPoint(data->window, &w, &h);
+
+            SDL_SendWindowEvent(data->window, SDL_WINDOWEVENT_RESIZED, w,
+                                h);
 
             /* Forces a WM_PAINT event */
             InvalidateRect(hwnd, NULL, FALSE);

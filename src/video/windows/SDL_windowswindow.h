@@ -81,10 +81,11 @@ extern int WIN_SetWindowHitTest(SDL_Window *window, SDL_bool enabled);
 extern void WIN_GetDrawableSize(const SDL_Window *window, int *w, int *h);
 extern void WIN_PhysicalToVirtual_ClientPoint(const SDL_Window *window, int *w, int *h);
 extern void WIN_VirtualToPhysical_ClientPoint(const SDL_Window *window, int *w, int *h);
+extern void WIN_VirtualToPhysical_ScreenPoint(int *x, int *y, int widthHint, int heightHint);
+extern void WIN_PhysicalToVirtual_ScreenPoint(int *x, int *y, int widthHint, int heightHint);
 extern void WIN_AdjustRect(const SDL_Window *window, LPRECT rect);
-extern int WIN_GetClientScreenRect_DPIUnaware(_THIS, HWND hwnd, LPRECT rect);
-extern void WIN_RectFromDPIUnaware(_THIS, LPRECT rect);
-extern void WIN_RectToDPIUnaware(_THIS, LPRECT rect);
+extern void WIN_RectFromDPIUnaware(_THIS, const RECT rect_unaware, LPRECT rectOut);
+extern void WIN_RectToDPIUnaware(_THIS, const RECT rect, LPRECT rectOut);
 
 #endif /* SDL_windowswindow_h_ */
 
