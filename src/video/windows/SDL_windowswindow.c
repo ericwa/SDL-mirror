@@ -1160,7 +1160,7 @@ void WIN_PhysicalToVirtual_ScreenPoint(int *x, int *y, int widthHint, int height
 /*
 takes a dpi-unaware rect, return a rect in the current thread's DPI awareness
 */
-BOOL WIN_RectFromDPIUnaware(_THIS, const RECT rect_unaware, LPRECT rectOut)
+static BOOL WIN_RectFromDPIUnaware_Win10Anniv(_THIS, const RECT rect_unaware, LPRECT rectOut)
 {
     SDL_VideoData *videodata = (SDL_VideoData *)_this->driverdata;
 
@@ -1227,7 +1227,7 @@ BOOL WIN_RectFromDPIUnaware(_THIS, const RECT rect_unaware, LPRECT rectOut)
 /*
 takes a rect in the current thread's DPI awareness, converts it to unaware
 */
-BOOL WIN_RectToDPIUnaware(_THIS, const RECT rect, LPRECT rectOut)
+static BOOL WIN_RectToDPIUnaware_Win10Anniv(_THIS, const RECT rect, LPRECT rectOut)
 {
     SDL_VideoData *videodata = (SDL_VideoData *)_this->driverdata;
 
@@ -1285,6 +1285,30 @@ BOOL WIN_RectToDPIUnaware(_THIS, const RECT rect, LPRECT rectOut)
         return TRUE;
     }
     return FALSE;
+}
+
+void WIN_RectFromDPIUnaware(_THIS, const RECT rect_unaware, LPRECT rectOut)
+{
+    SDL_VideoData *videodata = (SDL_VideoData *)_this->driverdata;
+    if (videodata->highdpi_enabled) {
+        if (videodata->SetThreadDpiAwarenessContext) {
+            BOOL ok = WIN_RectFromDPIUnaware_Win10Anniv(_this, rect_unaware, rectOut);
+        }
+    }
+    else {
+        *rectOut = rect_unaware;
+    }
+}
+
+void WIN_RectToDPIUnaware(_THIS, const RECT rect_dpiaware, LPRECT rectOut)
+{
+    SDL_VideoData *videodata = (SDL_VideoData *)_this->driverdata;
+    if (videodata->highdpi_enabled) {
+        BOOL ok = WIN_RectToDPIUnaware_Win10Anniv(_this, rect_dpiaware, rectOut);
+    }
+    else {
+        *rectOut = rect_dpiaware;
+    }
 }
 
 #endif /* SDL_VIDEO_DRIVER_WINDOWS */

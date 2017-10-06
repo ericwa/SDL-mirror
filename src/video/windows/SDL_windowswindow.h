@@ -84,8 +84,8 @@ extern void WIN_VirtualToPhysical_ClientPoint(const SDL_Window *window, int *w, 
 extern void WIN_VirtualToPhysical_ScreenPoint(int *x, int *y, int widthHint, int heightHint);
 extern void WIN_PhysicalToVirtual_ScreenPoint(int *x, int *y, int widthHint, int heightHint);
 extern void WIN_AdjustRect(const SDL_Window *window, LPRECT rect);
-extern BOOL WIN_RectFromDPIUnaware(_THIS, const RECT rect_unaware, LPRECT rectOut);
-extern BOOL WIN_RectToDPIUnaware(_THIS, const RECT rect, LPRECT rectOut);
+extern void WIN_RectFromDPIUnaware(_THIS, const RECT rect_unaware, LPRECT rectOut);
+extern void WIN_RectToDPIUnaware(_THIS, const RECT rect, LPRECT rectOut);
 
 #endif /* SDL_windowswindow_h_ */
 
