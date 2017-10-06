@@ -166,6 +166,7 @@ typedef struct SDL_VideoData
     BOOL (WINAPI *RegisterTouchWindow)( HWND, ULONG );
     BOOL (WINAPI *SetProcessDPIAware)( void );
     BOOL (WINAPI *SetProcessDpiAwarenessContext)( DPI_AWARENESS_CONTEXT );
+    DPI_AWARENESS_CONTEXT (WINAPI *SetThreadDpiAwarenessContext)( DPI_AWARENESS_CONTEXT );
     DPI_AWARENESS_CONTEXT (WINAPI *GetThreadDpiAwarenessContext)( void );
     DPI_AWARENESS (WINAPI *GetAwarenessFromDpiAwarenessContext)( DPI_AWARENESS_CONTEXT );
     BOOL (WINAPI *EnableNonClientDpiScaling)( HWND );
