@@ -824,6 +824,12 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             SDL_SendWindowEvent(data->window, SDL_WINDOWEVENT_RESIZED, w,
                                 h);
 
+#ifdef HIGHDPI_DEBUG
+            SDL_Log("WM_WINDOWPOSCHANGED: physical client rect: (%d, %d) (%d x %d) virtual client rect: (%d, %d) (%d x %d)\n", 
+                point.x, point.y, rect.right, rect.bottom,
+                x, y, w, h);
+#endif
+
             /* Forces a WM_PAINT event */
             InvalidateRect(hwnd, NULL, FALSE);
         }
