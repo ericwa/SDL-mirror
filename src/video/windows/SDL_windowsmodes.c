@@ -441,6 +441,21 @@ WIN_SetDisplayMode(_THIS, SDL_VideoDisplay * display, SDL_DisplayMode * mode)
     SDL_DisplayModeData *data = (SDL_DisplayModeData *) mode->driverdata;
     LONG status;
 
+    /*
+    High-DPI notes:
+
+    - ChangeDisplaySettingsEx always takes pixels.
+    - e.g. if the display is set to 2880x1800 with 200% scaling in the Control Panel,
+      - calling ChangeDisplaySettingsEx with a dmPelsWidth/Height other than 2880x1800 will
+        change the monitor DPI to 96. (100% scaling)
+      - calling ChangeDisplaySettingsEx with a dmPelsWidth/Height of 2880x1800 (or a NULL DEVMODE*) will
+        reset the monitor DPI to 192. (200% scaling)
+      NOTE: these are temporary changes in DPI, not modifications to the Control Panel setting.
+
+    - BUG: windows do not get a WM_DPICHANGED message after a ChangeDisplaySettingsEx, even though the
+      monitor DPI changes
+      (as of Windows 10 Creator's Update, at least)
+    */
     if (mode->driverdata == display->desktop_mode.driverdata) {
         status = ChangeDisplaySettingsEx(displaydata->DeviceName, NULL, NULL, CDS_FULLSCREEN, NULL);
     } else {
