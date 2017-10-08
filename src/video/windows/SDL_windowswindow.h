@@ -53,6 +53,8 @@ typedef struct
     int scaling_dpi;
 } SDL_WindowData;
 
+extern void WIN_AdjustWindowRect_SpecifiedRect(SDL_Window *window, int *x, int *y, int *width, int *height);
+extern void WIN_AdjustWindowRect(SDL_Window *window, int *x, int *y, int *width, int *height, SDL_bool use_current);
 extern int WIN_CreateWindow(_THIS, SDL_Window * window);
 extern int WIN_CreateWindowFrom(_THIS, SDL_Window * window, const void *data);
 extern void WIN_SetWindowTitle(_THIS, SDL_Window * window);
@@ -83,7 +85,6 @@ extern void WIN_PhysicalToVirtual_ClientPoint(const SDL_Window *window, int *w, 
 extern void WIN_VirtualToPhysical_ClientPoint(const SDL_Window *window, int *w, int *h);
 extern void WIN_VirtualToPhysical_ScreenPoint(int *x, int *y, int widthHint, int heightHint);
 extern void WIN_PhysicalToVirtual_ScreenPoint(int *x, int *y, int widthHint, int heightHint);
-extern void WIN_AdjustRect(const SDL_Window *window, LPRECT rect);
 extern void WIN_RectFromDPIUnaware(_THIS, const RECT rect_unaware, LPRECT rectOut);
 extern void WIN_RectToDPIUnaware(_THIS, const RECT rect, LPRECT rectOut);
 

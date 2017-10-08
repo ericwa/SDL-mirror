@@ -86,14 +86,88 @@ GetWindowStyle(SDL_Window * window)
 }
 
 static void
+WIN_AdjustWindowRectWithStyle_SpecifiedRect(SDL_Window *window, DWORD style, BOOL menu, int *x, int *y, int *width, int *height)
+{
+    const SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
+    RECT rect;
+    int x_pixels, y_pixels;
+    int w_pixels, h_pixels;
+
+    w_pixels = *width;
+    h_pixels = *height;
+    WIN_VirtualToPhysical_ClientPoint(window, &w_pixels, &h_pixels);
+
+    rect.left = 0;
+    rect.top = 0;
+    rect.right = w_pixels;
+    rect.bottom = h_pixels;
+
+    // borderless windows will have WM_NCCALCSIZE return 0 for the non-client area. When this happens, it looks like windows will send a resize message
+    // expanding the window client area to the previous window + chrome size, so shouldn't need to adjust the window size for the set styles.
+    if (!(window->flags & SDL_WINDOW_BORDERLESS))
+        if (data->videodata->highdpi_enabled && data->videodata->AdjustWindowRectExForDpi) {
+            data->videodata->AdjustWindowRectExForDpi(&rect, style, menu, 0, data->scaling_dpi);
+        } else {
+            AdjustWindowRectEx(&rect, style, menu, 0);
+        }
+
+    x_pixels = *x;
+    y_pixels = *y;
+    WIN_VirtualToPhysical_ScreenPoint(&x_pixels, &y_pixels, *width, *height);
+
+    *x = x_pixels + rect.left;
+    *y = y_pixels + rect.top;
+    *width = (rect.right - rect.left);
+    *height = (rect.bottom - rect.top);
+}
+
+static void
+WIN_AdjustWindowRectWithStyle(SDL_Window *window, DWORD style, BOOL menu, int *x, int *y, int *width, int *height, SDL_bool use_current)
+{
+    *x = (use_current ? window->x : window->windowed.x);
+    *y = (use_current ? window->y : window->windowed.y);
+    *width = (use_current ? window->w : window->windowed.w);
+    *height = (use_current ? window->h : window->windowed.h);
+
+    WIN_AdjustWindowRectWithStyle_SpecifiedRect(window, style, menu, x, y, width, height);
+}
+
+/*
+in: window client position / size in SDL screen coordinates. typically window->x/y/w/h or window->windowed.x/y/w/h
+out: window rect (incl. decoration) in Windows virtual screen coordinates (pixels if highdpi).
+*/
+void
+WIN_AdjustWindowRect_SpecifiedRect(SDL_Window *window, int *x, int *y, int *width, int *height)
+{
+    SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
+    HWND hwnd = data->hwnd;
+    DWORD style;
+    BOOL menu;
+
+    style = GetWindowLong(hwnd, GWL_STYLE);
+    menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(hwnd) != NULL);
+    WIN_AdjustWindowRectWithStyle_SpecifiedRect(window, style, menu, x, y, width, height);
+}
+
+void
+WIN_AdjustWindowRect(SDL_Window *window, int *x, int *y, int *width, int *height, SDL_bool use_current)
+{
+    *x = (use_current ? window->x : window->windowed.x);
+    *y = (use_current ? window->y : window->windowed.y);
+    *width = (use_current ? window->w : window->windowed.w);
+    *height = (use_current ? window->h : window->windowed.h);
+
+    WIN_AdjustWindowRect_SpecifiedRect(window, x, y, width, height);
+}
+
+static void
 WIN_SetWindowPositionInternal(_THIS, SDL_Window * window, UINT flags)
 {
     SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
     HWND hwnd = data->hwnd;
-    RECT rect;
     HWND top;
-    int w, h;
     int x, y;
+    int w, h;
 
     /* Figure out what the window area will be */
     if (SDL_ShouldAllowTopmost() && ((window->flags & (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_INPUT_FOCUS)) == (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_INPUT_FOCUS) || (window->flags & SDL_WINDOW_ALWAYS_ON_TOP))) {
@@ -102,35 +176,10 @@ WIN_SetWindowPositionInternal(_THIS, SDL_Window * window, UINT flags)
         top = HWND_NOTOPMOST;
     }
 
-    /* The SetWindowPos we are going to do might move the window to a new monitor
-       with a different DPI.
-
-       Calculate the new "physical" screen space position from SDL "virtual" screen coordinates
-       without using any information about the current state of the window;
-       this is a best-effort conversion, because depending on the size of the
-       window and what monitors it touches, we can't tell exactly what
-       monitor Windows will decide it belongs to.
-    
-       Calculate the new width/height in pixels assuming the destination monitor
-       will have the same DPI as the current one. If it doesn't, the WM_DPICHANGED 
-       will correct the size in pixels.
-    */
-    x = window->x;
-    y = window->y;
-    WIN_VirtualToPhysical_ScreenPoint(&x, &y, window->w, window->h);
-
-    w = data->window->w;
-    h = data->window->h;
-    WIN_VirtualToPhysical_ClientPoint(data->window, &w, &h);
-
-    rect.left = x;
-    rect.top = y;
-    rect.right = x + w;
-    rect.bottom = y + h;
-    WIN_AdjustRect(window, &rect);
+    WIN_AdjustWindowRect(window, &x, &y, &w, &h, SDL_TRUE);    
 
     data->expected_resize = SDL_TRUE;
-    SetWindowPos(hwnd, top, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, flags);
+    SetWindowPos(hwnd, top, x, y, w, h, flags);
     data->expected_resize = SDL_FALSE;
 }
 
@@ -141,7 +190,7 @@ WIN_DPIForHWND(const SDL_VideoData *videodata, HWND hwnd)
         return 96;
 
     // window 10+
-    if (videodata->GetDpiForWindow) { 
+    if (videodata->GetDpiForWindow) {
         return videodata->GetDpiForWindow(hwnd);
     }
 
@@ -167,39 +216,6 @@ WIN_DPIForHWND(const SDL_VideoData *videodata, HWND hwnd)
     }
 
     return 96;
-}
-
-static void
-WIN_AdjustRectForStyle(const SDL_Window * window, DWORD style, LPRECT rect)
-{
-    const SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
-    HWND hwnd = data->hwnd;
-    BOOL menu;
-
-    /* DJM - according to the docs for GetMenu(), the
-    return value is undefined if hwnd is a child window.
-    Apparently it's too difficult for MS to check
-    inside their function, so I have to do it here.
-    */
-    menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(hwnd) != NULL);
-    if (data->videodata->highdpi_enabled && data->videodata->AdjustWindowRectExForDpi) {
-        data->videodata->AdjustWindowRectExForDpi(rect, style, menu, 0, data->scaling_dpi);
-    } else {
-        AdjustWindowRectEx(rect, style, menu, 0);
-    }
-}
-
-void 
-WIN_AdjustRect(const SDL_Window * window, LPRECT rect)
-{
-    const SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
-    HWND hwnd = data->hwnd;
-    DWORD style;
-
-    /* Figure out what the window area will be */
-    style = GetWindowLong(hwnd, GWL_STYLE);
-
-    WIN_AdjustRectForStyle(window, style, rect);
 }
 
 static int
@@ -262,25 +278,12 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, HWND parent, SDL_bool cre
             WIN_PhysicalToVirtual_ClientPoint(window, &w, &h);
             if ((window->w && window->w != w) || (window->h && window->h != h)) {
                 /* We tried to create a window larger than the desktop and Windows didn't allow it.  Override! */
-                RECT rect;
                 int x, y;
+                int w, h;
 
                 /* Figure out what the window area will be */
-                x = window->x;
-                y = window->y;
-                WIN_VirtualToPhysical_ScreenPoint(&x, &y, window->w, window->h);
-
-                w = window->w;
-                h = window->h;
-                WIN_VirtualToPhysical_ClientPoint(window, &w, &h);
-                
-                rect.left = x;
-                rect.top = y;
-                rect.right = x + w;
-                rect.bottom = y + h;
-                WIN_AdjustRect(window, &rect);
-
-                SetWindowPos(hwnd, HWND_NOTOPMOST, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOCOPYBITS | SWP_NOZORDER | SWP_NOACTIVATE);
+                WIN_AdjustWindowRect(window, &x, &y, &w, &h, SDL_TRUE);
+                SetWindowPos(hwnd, HWND_NOTOPMOST, x, y, w, h, SWP_NOCOPYBITS | SWP_NOZORDER | SWP_NOACTIVATE);
             } else {
                 window->w = w;
                 window->h = h;
@@ -359,6 +362,8 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, HWND parent, SDL_bool cre
     /* All done! */
     return 0;
 }
+
+
 
 int
 WIN_CreateWindow(_THIS, SDL_Window * window)
@@ -643,7 +648,6 @@ WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, 
     SDL_Rect bounds;
     DWORD style;
     HWND top;
-    RECT rect;
     int x, y;
     int w, h;
 
@@ -693,24 +697,9 @@ WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, 
             style |= WS_MAXIMIZE;
             data->windowed_mode_was_maximized = SDL_FALSE;
         }
-        w = window->windowed.w;
-        h = window->windowed.h;
-        WIN_VirtualToPhysical_ClientPoint(window, &w, &h);
 
-        x = window->windowed.x;
-        y = window->windowed.y;
-        WIN_VirtualToPhysical_ScreenPoint(&x, &y, window->windowed.w, window->windowed.h);
-
-        rect.left = x;
-        rect.top = y;
-        rect.right = x + w;
-        rect.bottom = y + h;
-        WIN_AdjustRectForStyle(window, style, &rect);
-
-        x = rect.left;
-        y = rect.top;
-        w = (rect.right - rect.left);
-        h = (rect.bottom - rect.top);
+        menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(hwnd) != NULL);
+        WIN_AdjustWindowRectWithStyle(window, style, menu, &x, &y, &w, &h, SDL_FALSE);
     }
     SetWindowLong(hwnd, GWL_STYLE, style);
     data->expected_resize = SDL_TRUE;

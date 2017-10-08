@@ -710,6 +710,7 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             int w, h;
             int min_w, min_h;
             int max_w, max_h;
+            int unused_x, unused_y;
             BOOL constrain_max_size;
 
             if (SDL_IsShapedWindow(data->window))
@@ -748,14 +749,10 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 constrain_max_size = FALSE;
             }
 
-            size.top = 0;
-            size.left = 0;
-            size.bottom = h;
-            size.right = w;
-
-            WIN_AdjustRect(data->window, &size);
-            w = size.right - size.left;
-            h = size.bottom - size.top;
+            /* Convert w/h from points of the client rect only, to pixels including the frame. */
+            unused_x = 0;
+            unused_y = 0;
+            WIN_AdjustWindowRect_SpecifiedRect(data->window, &unused_x, &unused_y, &w, &h);
 
             /* Fix our size to the current size */
             info = (MINMAXINFO *) lParam;
@@ -1035,8 +1032,7 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         {
             const int newDPI = HIWORD(wParam);
             RECT* const suggestedRect = (RECT*)lParam;
-            RECT size;
-            int w, h;
+            int x, y, w, h;
 
 #ifdef HIGHDPI_DEBUG
             SDL_Log("WM_DPICHANGED: new DPI: %d suggested rect: (%d, %d), (%dx%d)\n", newDPI, suggestedRect->left, suggestedRect->top, suggestedRect->right - suggestedRect->left, suggestedRect->bottom - suggestedRect->top);
@@ -1053,24 +1049,10 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                calculate the width/height ourselves such that the apparent size
                of the client rect remains the same. 
             */
-            w = data->window->w;
-            h = data->window->h;
-            WIN_VirtualToPhysical_ClientPoint(data->window, &w, &h);
+            WIN_AdjustWindowRect(data->window, &x, &y, &w, &h, SDL_TRUE);
 #ifdef HIGHDPI_DEBUG
             SDL_Log("WM_DPICHANGED: current SDL window size is (%dx%d) points, want (%dx%d) pixels client size at new DPI (%d)\n",
                 data->window->w, data->window->h, w, h, newDPI);
-#endif
-
-            size.top = 0;
-            size.left = 0;
-            size.bottom = h;
-            size.right = w;
-            WIN_AdjustRect(data->window, &size);
-
-            w = size.right - size.left;
-            h = size.bottom - size.top;
-
-#ifdef HIGHDPI_DEBUG
             SDL_Log("WM_DPICHANGED: calling SetWindowPos: (%d, %d), (%dx%d)\n", suggestedRect->left, suggestedRect->top, w, h);
 #endif
 

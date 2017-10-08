@@ -383,7 +383,7 @@ WIN_GetDisplayUsableBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
     RECT workScaled;
     int hdpi, vdpi;
 
-    if (WIN_GetDisplayDPIInternal(_this, display, &hdpi, &vdpi) != 0) {
+    if (WIN_GetDisplayDPIInternal(_this, data->MonitorHandle, &hdpi, &vdpi) != 0) {
         return SDL_SetError("Couldn't find monitor DPI");
     }
 
