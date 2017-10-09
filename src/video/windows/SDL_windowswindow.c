@@ -45,6 +45,8 @@
 #define SWP_NOCOPYBITS 0
 #endif
 
+/* #define HIGHDPI_DEBUG */
+
 /* Fake window to help with DirectInput events. */
 HWND SDL_HelperWindow = NULL;
 static WCHAR *SDL_HelperWindowClassName = TEXT("SDLHelperWindowInputCatcher");
@@ -645,12 +647,20 @@ WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, 
 {
     SDL_DisplayData *displaydata = (SDL_DisplayData *) display->driverdata;
     SDL_WindowData *data = (SDL_WindowData *) window->driverdata;
+    SDL_VideoData *videodata = data->videodata;
     HWND hwnd = data->hwnd;
     MONITORINFO minfo;
     DWORD style;
     HWND top;
     int x, y;
     int w, h;
+
+    /* BUG: windows don't receive a WM_DPICHANGED message after a ChangeDisplaySettingsEx,
+       so we must manually update the cached DPI (see WIN_SetDisplayMode). */
+#ifdef HIGHDPI_DEBUG
+    SDL_Log("WIN_SetWindowFullscreen: dpi: %d (stale) cached dpi: %d", WIN_DPIForHWND(videodata, hwnd), data->scaling_dpi);
+#endif
+    data->scaling_dpi = WIN_DPIForHWND(videodata, hwnd);
 
     if (SDL_ShouldAllowTopmost() && ((window->flags & (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_INPUT_FOCUS)) == (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_INPUT_FOCUS) || window->flags & SDL_WINDOW_ALWAYS_ON_TOP)) {
         top = HWND_TOPMOST;
