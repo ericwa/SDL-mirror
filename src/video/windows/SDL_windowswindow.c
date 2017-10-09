@@ -643,9 +643,10 @@ WIN_RestoreWindow(_THIS, SDL_Window * window)
 void
 WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, SDL_bool fullscreen)
 {
+    SDL_DisplayData *displaydata = (SDL_DisplayData *) display->driverdata;
     SDL_WindowData *data = (SDL_WindowData *) window->driverdata;
     HWND hwnd = data->hwnd;
-    SDL_Rect bounds;
+    MONITORINFO minfo;
     DWORD style;
     HWND top;
     int x, y;
@@ -661,21 +662,22 @@ WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, 
     style &= ~STYLE_MASK;
     style |= GetWindowStyle(window);
 
-    WIN_GetDisplayBounds(_this, display, &bounds);
+    /* Prefer GetMonitorInfo over WIN_GetDisplayBounds because we want the
+       monitor bounds in pixels rather than SDL coordinates (points). */
+    SDL_zero(minfo);
+    minfo.cbSize = sizeof(MONITORINFO);
+    if (!GetMonitorInfo(displaydata->MonitorHandle, &minfo)) {
+        SDL_SetError("GetMonitorInfo failed");
+        return;
+    }
 
     if (fullscreen) {
 		float xdpi, ydpi;
 
-        x = bounds.x;
-        y = bounds.y;
-        w = bounds.w;
-        h = bounds.h;
-
-		// convert from scaled to unscaled
-		if (0 == WIN_GetDisplayDPI(_this, display, NULL, &xdpi, &ydpi)) {
-			w = MulDiv(w, (int)xdpi, 96);
-			h = MulDiv(h, (int)ydpi, 96);
-		}
+        x = minfo.rcMonitor.left;
+        y = minfo.rcMonitor.top;
+        w = minfo.rcMonitor.right - minfo.rcMonitor.left;
+        h = minfo.rcMonitor.bottom - minfo.rcMonitor.top;
 
         /* Unset the maximized flag.  This fixes
            https://bugzilla.libsdl.org/show_bug.cgi?id=3215
