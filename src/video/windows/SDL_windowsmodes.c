@@ -240,38 +240,6 @@ WIN_InitModes(_THIS)
     return 0;
 }
 
-int
-WIN_GetDisplayBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
-{
-    const SDL_DisplayData *data = (const SDL_DisplayData *)display->driverdata;
-    const SDL_VideoData *vid_data = (const SDL_VideoData *)_this->driverdata;
-    MONITORINFO minfo;
-    RECT rectScaled;
-    BOOL rc;
-    int hdpi, vdpi;
-
-    if (WIN_GetDisplayDPIInternal(_this, data->MonitorHandle, &hdpi, &vdpi) != 0) {
-        return SDL_SetError("Couldn't find monitor DPI");
-    }
-
-    SDL_zero(minfo);
-    minfo.cbSize = sizeof(MONITORINFO);
-    rc = GetMonitorInfo(data->MonitorHandle, &minfo);
-
-    if (!rc) {
-        return SDL_SetError("Couldn't find monitor data");
-    }
-
-    WIN_RectToDPIUnaware(_this, minfo.rcMonitor, &rectScaled);
-
-    rect->x = rectScaled.left;
-    rect->y = rectScaled.top;
-    rect->w = rectScaled.right - rectScaled.left;
-    rect->h = rectScaled.bottom - rectScaled.top;
-
-    return 0;
-}
-
 /*
 Gets the DPI of a monitor.
 Always returns something in hdpi_out and vdpi_out; 96, 96 on failure.
@@ -371,17 +339,17 @@ WIN_GetDisplayDPI(_THIS, SDL_VideoDisplay * display, float * ddpi_out, float * h
     return ddpi != 0.0f ? 0 : SDL_SetError("Couldn't get DPI");
 }
 
-int
-WIN_GetDisplayUsableBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
+static int
+WIN_GetDisplayBoundsInternal(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect, SDL_bool usable)
 {
     const SDL_DisplayData *data = (const SDL_DisplayData *)display->driverdata;
     const SDL_VideoData *vid_data = (const SDL_VideoData *)_this->driverdata;
     MONITORINFO minfo;
+    const RECT *rect_pixels;
     BOOL rc;
-    LPRECT monitor;
-    LPRECT work;
-    RECT workScaled;
     int hdpi, vdpi;
+    int x, y;
+    int w, h;
 
     if (WIN_GetDisplayDPIInternal(_this, data->MonitorHandle, &hdpi, &vdpi) != 0) {
         return SDL_SetError("Couldn't find monitor DPI");
@@ -394,18 +362,36 @@ WIN_GetDisplayUsableBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
     if (!rc) {
         return SDL_SetError("Couldn't find monitor data");
     }
-    
-    monitor = &minfo.rcMonitor;
-    work = &minfo.rcWork;
 
-    WIN_RectToDPIUnaware(_this, *work, &workScaled);
+    rect_pixels = usable ? &minfo.rcWork : &minfo.rcMonitor;
 
-    rect->x = workScaled.left;
-    rect->y = workScaled.top;
-    rect->w = workScaled.right - workScaled.left;
-    rect->h = workScaled.bottom - workScaled.top;
+    x = rect_pixels->left;
+    y = rect_pixels->top;
+    w = rect_pixels->right - rect_pixels->left;
+    h = rect_pixels->bottom - rect_pixels->top;
+    WIN_PhysicalToVirtual_ScreenPoint(&x, &y, w, h);
+
+    w = MulDiv(w, 96, hdpi);
+    h = MulDiv(h, 96, vdpi);
+
+    rect->x = x;
+    rect->y = y;
+    rect->w = w;
+    rect->h = h;
 
     return 0;
+}
+
+int
+WIN_GetDisplayBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
+{
+    return WIN_GetDisplayBoundsInternal(_this, display, rect, SDL_FALSE);
+}
+
+int
+WIN_GetDisplayUsableBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
+{
+    return WIN_GetDisplayBoundsInternal(_this, display, rect, SDL_TRUE);
 }
 
 void
