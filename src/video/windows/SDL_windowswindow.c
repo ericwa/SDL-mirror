@@ -25,6 +25,7 @@
 #include "../../core/windows/SDL_windows.h"
 
 #include "SDL_assert.h"
+#include "SDL_log.h"
 #include "../SDL_sysvideo.h"
 #include "../SDL_pixels_c.h"
 #include "../../events/SDL_keyboard_c.h"
@@ -178,7 +179,15 @@ WIN_SetWindowPositionInternal(_THIS, SDL_Window * window, UINT flags)
         top = HWND_NOTOPMOST;
     }
 
+#ifdef HIGHDPI_DEBUG
+    SDL_Log("WIN_SetWindowPositionInternal: (%d, %d) (%d x %d)", window->x, window->y, window->w, window->h);
+#endif
+
     WIN_AdjustWindowRect(window, &x, &y, &w, &h, SDL_TRUE);    
+
+#ifdef HIGHDPI_DEBUG
+    SDL_Log("WIN_SetWindowPositionInternal: calling SetWindowPos (%d, %d) (%d x %d)", x, y, w, h);
+#endif
 
     data->expected_resize = SDL_TRUE;
     SetWindowPos(hwnd, top, x, y, w, h, flags);
@@ -664,7 +673,11 @@ WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, 
     /* BUG: windows don't receive a WM_DPICHANGED message after a ChangeDisplaySettingsEx,
        so we must manually update the cached DPI (see WIN_SetDisplayMode). */
 #ifdef HIGHDPI_DEBUG
-    SDL_Log("WIN_SetWindowFullscreen: dpi: %d (stale) cached dpi: %d", WIN_DPIForHWND(videodata, hwnd), data->scaling_dpi);
+    {
+        int xdpi, ydpi;
+        WIN_GetDPIForHWND(videodata, hwnd, &xdpi, &ydpi);
+        SDL_Log("WIN_SetWindowFullscreen: dpi: %d, stale cached dpi: %d", xdpi, data->scaling_xdpi);
+    }
 #endif
     WIN_GetDPIForHWND(videodata, hwnd, &data->scaling_xdpi, &data->scaling_ydpi);
 
