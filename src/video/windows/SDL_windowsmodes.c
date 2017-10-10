@@ -457,8 +457,14 @@ WIN_SetDisplayMode(_THIS, SDL_VideoDisplay * display, SDL_DisplayMode * mode)
       (as of Windows 10 Creator's Update, at least)
     */
     if (mode->driverdata == display->desktop_mode.driverdata) {
+#ifdef DEBUG_MODES
+        SDL_Log("WIN_SetDisplayMode: resetting to original resolution");
+#endif
         status = ChangeDisplaySettingsEx(displaydata->DeviceName, NULL, NULL, CDS_FULLSCREEN, NULL);
     } else {
+#ifdef DEBUG_MODES
+        SDL_Log("WIN_SetDisplayMode: changing to %dx%d pixels", data->DeviceMode.dmPelsWidth, data->DeviceMode.dmPelsHeight);
+#endif
         status = ChangeDisplaySettingsEx(displaydata->DeviceName, &data->DeviceMode, NULL, CDS_FULLSCREEN, NULL);
     }
     if (status != DISP_CHANGE_SUCCESSFUL) {
