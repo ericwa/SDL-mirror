@@ -231,15 +231,10 @@ WIN_VideoInit(_THIS)
     SDL_VideoData *data = SDL_static_cast(SDL_VideoData *, _this->driverdata);
 
     /* Set the process DPI awareness */
-    if (SDL_GetHintBoolean(SDL_HINT_VIDEO_HIGHDPI_ENABLED, SDL_FALSE)) {
-        /* Set this flag to indicate that the application requested DPI awareness.
-           
-           We don't want to change behaviour of apps that were requesting DPI awareness
-           from Windows, but assumed SDL was non-DPI-aware. So, only enable DPI-awareness
-           codepaths if the application explicitly set the SDL_HINT_VIDEO_HIGHDPI_ENABLED hint.
-        */
-        data->highdpi_enabled = SDL_TRUE;
+    data->highdpi_enabled = SDL_FALSE;
+    data->highdpi_system_aware = SDL_FALSE;
 
+    if (SDL_GetHintBoolean(SDL_HINT_VIDEO_HIGHDPI_ENABLED, SDL_FALSE)) {
         if (data->SetProcessDpiAwarenessContext) {
             /* Windows 10 Anniversary Update+ */
             BOOL result;
@@ -249,31 +244,35 @@ WIN_VideoInit(_THIS)
             if (!result) {
                 result = data->SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
             }
+
+            /* The above calls will fail if process DPI awareness was set externally to SDL.
+               In that case, don't enable SDL's highdpi support. */
+            if (result) {
+                data->highdpi_enabled = SDL_TRUE;
+            }
         } else if (data->SetProcessDpiAwareness) {
-            /* Windows 8.1-Windows 10 
-               These OS'es support per-monitor DPI awareness, but they don't offer a good
-               way to convert between points and pixels (which SDL needs) so we only
-               support system DPI awareness on these OS'es.
-            */
-            HRESULT result = data->SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE);
-            data->highdpi_system_aware = SDL_TRUE;
+            /* Windows 8.1-Windows 10 */
+            HRESULT result = data->SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+            if (result == S_OK) {
+                data->highdpi_enabled = SDL_TRUE;
+            }
         } else if (data->SetProcessDPIAware) {
-            /* Vista+ */
+            /* Vista-Windows 8.0 */
             BOOL success = data->SetProcessDPIAware();
-            data->highdpi_system_aware = SDL_TRUE;
-        }
+            if (success) {
+                HDC hdc = GetDC(NULL);
+                if (hdc) {
+                    data->highdpi_enabled = SDL_TRUE;
+                    data->highdpi_system_aware = SDL_TRUE;
 
-        /* If we are system-DPI aware, we can cache the DPI values 
-           (according to https://msdn.microsoft.com/en-us/library/windows/desktop/dn280512(v=vs.85).aspx ) */
-        if (data->highdpi_system_aware) {
-            data->highdpi_system_xdpi = 96;
-            data->highdpi_system_ydpi = 96;
+                    /* If we are system-DPI aware, we can cache the DPI values
+                    (according to https://msdn.microsoft.com/en-us/library/windows/desktop/dn280512(v=vs.85).aspx ) */
 
-            HDC hdc = GetDC(NULL);
-            if (hdc) {
-                data->highdpi_system_xdpi = GetDeviceCaps(hdc, LOGPIXELSX);
-                data->highdpi_system_ydpi = GetDeviceCaps(hdc, LOGPIXELSY);
-                ReleaseDC(NULL, hdc);
+                    data->highdpi_system_xdpi = GetDeviceCaps(hdc, LOGPIXELSX);
+                    data->highdpi_system_ydpi = GetDeviceCaps(hdc, LOGPIXELSY);
+
+                    ReleaseDC(NULL, hdc);
+                }
             }
         }
     }
