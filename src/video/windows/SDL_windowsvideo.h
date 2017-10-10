@@ -181,9 +181,6 @@ typedef struct SDL_VideoData
     HRESULT (WINAPI *SetProcessDpiAwareness)(PROCESS_DPI_AWARENESS dpiAwareness);
 
     SDL_bool highdpi_enabled;
-    SDL_bool highdpi_system_aware;
-    int highdpi_system_xdpi;
-    int highdpi_system_ydpi;
 
     SDL_bool ime_com_initialized;
     struct ITfThreadMgr *ime_threadmgr;

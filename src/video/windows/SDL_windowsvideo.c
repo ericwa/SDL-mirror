@@ -232,7 +232,6 @@ WIN_VideoInit(_THIS)
 
     /* Set the process DPI awareness */
     data->highdpi_enabled = SDL_FALSE;
-    data->highdpi_system_aware = SDL_FALSE;
 
     if (SDL_GetHintBoolean(SDL_HINT_VIDEO_HIGHDPI_ENABLED, SDL_FALSE)) {
         if (data->SetProcessDpiAwarenessContext) {
@@ -259,20 +258,8 @@ WIN_VideoInit(_THIS)
         } else if (data->SetProcessDPIAware) {
             /* Vista-Windows 8.0 */
             BOOL success = data->SetProcessDPIAware();
-            if (success) {
-                HDC hdc = GetDC(NULL);
-                if (hdc) {
-                    data->highdpi_enabled = SDL_TRUE;
-                    data->highdpi_system_aware = SDL_TRUE;
-
-                    /* If we are system-DPI aware, we can cache the DPI values
-                    (according to https://msdn.microsoft.com/en-us/library/windows/desktop/dn280512(v=vs.85).aspx ) */
-
-                    data->highdpi_system_xdpi = GetDeviceCaps(hdc, LOGPIXELSX);
-                    data->highdpi_system_ydpi = GetDeviceCaps(hdc, LOGPIXELSY);
-
-                    ReleaseDC(NULL, hdc);
-                }
+            if (success) {                
+                data->highdpi_enabled = SDL_TRUE;
             }
         }
     }
