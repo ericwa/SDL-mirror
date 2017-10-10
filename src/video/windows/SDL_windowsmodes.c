@@ -434,12 +434,39 @@ WIN_GetDisplayModes(_THIS, SDL_VideoDisplay * display)
     }
 }
 
+static void
+WIN_LogMonitor(_THIS, HMONITOR mon)
+{
+    const SDL_VideoData *vid_data = (const SDL_VideoData *)_this->driverdata;
+    MONITORINFOEXA minfo;
+    UINT xdpi = 0, ydpi = 0;
+
+    if (vid_data->GetDpiForMonitor)
+        vid_data->GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, &xdpi, &ydpi);
+
+    SDL_zero(minfo);
+    minfo.cbSize = sizeof(minfo);
+    GetMonitorInfoA(mon, &minfo);
+
+    SDL_Log("monitor \"%s\" dpi: %d. (%d, %d), %dx%d pixels",
+        minfo.szDevice,
+        xdpi,
+        minfo.rcMonitor.left,
+        minfo.rcMonitor.top,
+        minfo.rcMonitor.right - minfo.rcMonitor.left,
+        minfo.rcMonitor.bottom - minfo.rcMonitor.top);
+}
+
 int
 WIN_SetDisplayMode(_THIS, SDL_VideoDisplay * display, SDL_DisplayMode * mode)
 {
     SDL_DisplayData *displaydata = (SDL_DisplayData *) display->driverdata;
     SDL_DisplayModeData *data = (SDL_DisplayModeData *) mode->driverdata;
     LONG status;
+
+#ifdef DEBUG_MODES
+    WIN_LogMonitor(_this, displaydata->MonitorHandle);
+#endif
 
     /*
     High-DPI notes:
@@ -485,6 +512,11 @@ WIN_SetDisplayMode(_THIS, SDL_VideoDisplay * display, SDL_DisplayMode * mode)
         }
         return SDL_SetError("ChangeDisplaySettingsEx() failed: %s", reason);
     }
+
+#ifdef DEBUG_MODES
+    WIN_LogMonitor(_this, displaydata->MonitorHandle);
+#endif
+
     EnumDisplaySettings(displaydata->DeviceName, ENUM_CURRENT_SETTINGS, &data->DeviceMode);
     WIN_UpdateDisplayMode(_this, displaydata->MonitorHandle, displaydata->DeviceName, ENUM_CURRENT_SETTINGS, mode);
     return 0;
