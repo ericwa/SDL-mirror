@@ -662,6 +662,10 @@ WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, 
 #endif
     data->scaling_dpi = WIN_DPIForHWND(videodata, hwnd);
 
+    /* clear the window size, to cause us to send a SDL_WINDOWEVENT_RESIZED event in WM_WINDOWPOSCHANGED */
+    data->window->w = 0;
+    data->window->h = 0;
+
     if (SDL_ShouldAllowTopmost() && ((window->flags & (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_INPUT_FOCUS)) == (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_INPUT_FOCUS) || window->flags & SDL_WINDOW_ALWAYS_ON_TOP)) {
         top = HWND_TOPMOST;
     } else {
