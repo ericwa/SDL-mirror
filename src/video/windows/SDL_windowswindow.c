@@ -108,7 +108,7 @@ WIN_AdjustWindowRectWithStyle_SpecifiedRect(SDL_Window *window, DWORD style, BOO
     // expanding the window client area to the previous window + chrome size, so shouldn't need to adjust the window size for the set styles.
     if (!(window->flags & SDL_WINDOW_BORDERLESS))
         if (data->videodata->highdpi_enabled && data->videodata->AdjustWindowRectExForDpi) {
-            data->videodata->AdjustWindowRectExForDpi(&rect, style, menu, 0, data->scaling_dpi);
+            data->videodata->AdjustWindowRectExForDpi(&rect, style, menu, 0, data->scaling_xdpi);
         } else {
             AdjustWindowRectEx(&rect, style, menu, 0);
         }
@@ -185,39 +185,45 @@ WIN_SetWindowPositionInternal(_THIS, SDL_Window * window, UINT flags)
     data->expected_resize = SDL_FALSE;
 }
 
-static UINT
-WIN_DPIForHWND(const SDL_VideoData *videodata, HWND hwnd)
+static void
+WIN_GetDPIForHWND(const SDL_VideoData *videodata, HWND hwnd, int *xdpi, int *ydpi)
 {
-    if (!videodata->highdpi_enabled)
-        return 96;
+    *xdpi = 96;
+    *ydpi = 96;
 
-    // window 10+
+    /* highdpi not requested? */
+    if (!videodata->highdpi_enabled)
+        return;
+
+    /* Window 10+ */
     if (videodata->GetDpiForWindow) {
-        return videodata->GetDpiForWindow(hwnd);
+        *xdpi = videodata->GetDpiForWindow(hwnd);
+        *ydpi = *xdpi;
+        return;
     }
 
-    // window 8.1+
+    /* window 8.1+ */
     if (videodata->GetDpiForMonitor) {
         HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
         if (monitor) {
-            UINT xdpi, ydpi;
-            if (S_OK == videodata->GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &xdpi, &ydpi)) {
-                return xdpi;
+            UINT xdpi_uint, ydpi_uint;
+            if (S_OK == videodata->GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &xdpi_uint, &ydpi_uint)) {
+                *xdpi = xdpi_uint;
+                *ydpi = ydpi_uint;
             }
         }
+        return;
     }
 
-    // windows 8.0 and below
+    /* windows 8.0 and below */
     {
         HDC hdc = GetDC(NULL);
         if (hdc) {
-            UINT dpi = GetDeviceCaps(hdc, LOGPIXELSX);
+            *xdpi = GetDeviceCaps(hdc, LOGPIXELSX);
+            *ydpi = GetDeviceCaps(hdc, LOGPIXELSY);
             ReleaseDC(NULL, hdc);
-            return dpi;
         }
     }
-
-    return 96;
 }
 
 static int
@@ -240,7 +246,7 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, HWND parent, SDL_bool cre
     data->mouse_button_flags = 0;
     data->videodata = videodata;
     data->initializing = SDL_TRUE;
-    data->scaling_dpi = WIN_DPIForHWND(videodata, hwnd);
+    WIN_GetDPIForHWND(videodata, hwnd, &data->scaling_xdpi, &data->scaling_ydpi);
 
     window->driverdata = data;
 
@@ -660,7 +666,7 @@ WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, 
 #ifdef HIGHDPI_DEBUG
     SDL_Log("WIN_SetWindowFullscreen: dpi: %d (stale) cached dpi: %d", WIN_DPIForHWND(videodata, hwnd), data->scaling_dpi);
 #endif
-    data->scaling_dpi = WIN_DPIForHWND(videodata, hwnd);
+    WIN_GetDPIForHWND(videodata, hwnd, &data->scaling_xdpi, &data->scaling_ydpi);
 
     /* clear the window size, to cause us to send a SDL_WINDOWEVENT_RESIZED event in WM_WINDOWPOSCHANGED */
     data->window->w = 0;
@@ -1028,8 +1034,8 @@ WIN_PhysicalToVirtual_ClientPoint(const SDL_Window *window, int *x, int *y)
 {
     const SDL_WindowData *data = ((SDL_WindowData *)window->driverdata);
 
-    *x = MulDiv(*x, 96, data->scaling_dpi);
-    *y = MulDiv(*y, 96, data->scaling_dpi);
+    *x = MulDiv(*x, 96, data->scaling_xdpi);
+    *y = MulDiv(*y, 96, data->scaling_ydpi);
 }
 
 void
@@ -1037,8 +1043,8 @@ WIN_VirtualToPhysical_ClientPoint(const SDL_Window *window, int *x, int *y)
 {
     const SDL_WindowData *data = ((SDL_WindowData *)window->driverdata);
 
-    *x = MulDiv(*x, data->scaling_dpi, 96);
-    *y = MulDiv(*y, data->scaling_dpi, 96);
+    *x = MulDiv(*x, data->scaling_xdpi, 96);
+    *y = MulDiv(*y, data->scaling_ydpi, 96);
 }
 
 /* Given a point in screen coordinates (they're interpreted as Windows coordinates)

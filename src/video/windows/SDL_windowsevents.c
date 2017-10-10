@@ -1039,7 +1039,8 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 #endif
 
             /* update the cached DPI value for this window */
-            data->scaling_dpi = newDPI;
+            data->scaling_xdpi = newDPI;
+            data->scaling_ydpi = newDPI;
 
             /* Example code for hanling WM_DPICHANGED usually just calls SetWindowPos with the 
                values from suggestedRect, but this preserves the apparent size of the window rect,
