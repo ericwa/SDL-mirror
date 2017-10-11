@@ -88,22 +88,20 @@ GetWindowStyle(SDL_Window * window)
     return style;
 }
 
+/*
+in: virtual screen coordinates (in pixels) of a window client rect
+out: virtual screen coordinates (in pixels) of a window rect (including frame)
+*/
 static void
 WIN_AdjustWindowRectWithStyle_SpecifiedRect(SDL_Window *window, DWORD style, BOOL menu, int *x, int *y, int *width, int *height)
 {
     const SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
     RECT rect;
-    int x_pixels, y_pixels;
-    int w_pixels, h_pixels;
-
-    w_pixels = *width;
-    h_pixels = *height;
-    WIN_VirtualToPhysical_ClientPoint(window, &w_pixels, &h_pixels);
 
     rect.left = 0;
     rect.top = 0;
-    rect.right = w_pixels;
-    rect.bottom = h_pixels;
+    rect.right = *width;
+    rect.bottom = *height;
 
     // borderless windows will have WM_NCCALCSIZE return 0 for the non-client area. When this happens, it looks like windows will send a resize message
     // expanding the window client area to the previous window + chrome size, so shouldn't need to adjust the window size for the set styles.
@@ -114,30 +112,45 @@ WIN_AdjustWindowRectWithStyle_SpecifiedRect(SDL_Window *window, DWORD style, BOO
             AdjustWindowRectEx(&rect, style, menu, 0);
         }
 
-    x_pixels = *x;
-    y_pixels = *y;
-    WIN_VirtualToPhysical_ScreenPoint(&x_pixels, &y_pixels, *width, *height);
-
-    *x = x_pixels + rect.left;
-    *y = y_pixels + rect.top;
+    *x += rect.left;
+    *y += rect.top;
     *width = (rect.right - rect.left);
     *height = (rect.bottom - rect.top);
 }
 
+/*
+out: virtual screen coordinates (in pixels) of a window rect (including frame)
+*/
 static void
 WIN_AdjustWindowRectWithStyle(SDL_Window *window, DWORD style, BOOL menu, int *x, int *y, int *width, int *height, SDL_bool use_current)
 {
-    *x = (use_current ? window->x : window->windowed.x);
-    *y = (use_current ? window->y : window->windowed.y);
-    *width = (use_current ? window->w : window->windowed.w);
-    *height = (use_current ? window->h : window->windowed.h);
+    int x_pixels, y_pixels;
+    int w_pixels, h_pixels;
 
-    WIN_AdjustWindowRectWithStyle_SpecifiedRect(window, style, menu, x, y, width, height);
+    const int x_points = (use_current ? window->x : window->windowed.x);
+    const int y_points = (use_current ? window->y : window->windowed.y);
+    const int width_points = (use_current ? window->w : window->windowed.w);
+    const int height_points = (use_current ? window->h : window->windowed.h);
+
+    w_pixels = width_points;
+    h_pixels = height_points;
+    WIN_VirtualToPhysical_ClientPoint(window, &w_pixels, &h_pixels);
+
+    x_pixels = x_points;
+    y_pixels = y_points;
+    WIN_VirtualToPhysical_ScreenPoint(&x_pixels, &y_pixels, width_points, height_points);
+
+    WIN_AdjustWindowRectWithStyle_SpecifiedRect(window, style, menu, &x_pixels, &y_pixels, &w_pixels, &h_pixels);
+
+    *x = x_pixels;
+    *y = y_pixels;
+    *width = w_pixels;
+    *height = h_pixels;
 }
 
 /*
-in: window client position / size in SDL screen coordinates. typically window->x/y/w/h or window->windowed.x/y/w/h
-out: window rect (incl. decoration) in Windows virtual screen coordinates (pixels if highdpi).
+in: virtual screen coordinates (in pixels) of a window client rect
+out: virtual screen coordinates (in pixels) of a window rect (including frame)
 */
 void
 WIN_AdjustWindowRect_SpecifiedRect(SDL_Window *window, int *x, int *y, int *width, int *height)
@@ -152,15 +165,20 @@ WIN_AdjustWindowRect_SpecifiedRect(SDL_Window *window, int *x, int *y, int *widt
     WIN_AdjustWindowRectWithStyle_SpecifiedRect(window, style, menu, x, y, width, height);
 }
 
+/*
+out: virtual screen coordinates (in pixels) of a window rect (including frame)
+*/
 void
 WIN_AdjustWindowRect(SDL_Window *window, int *x, int *y, int *width, int *height, SDL_bool use_current)
 {
-    *x = (use_current ? window->x : window->windowed.x);
-    *y = (use_current ? window->y : window->windowed.y);
-    *width = (use_current ? window->w : window->windowed.w);
-    *height = (use_current ? window->h : window->windowed.h);
+    SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
+    HWND hwnd = data->hwnd;
+    DWORD style;
+    BOOL menu;
 
-    WIN_AdjustWindowRect_SpecifiedRect(window, x, y, width, height);
+    style = GetWindowLong(hwnd, GWL_STYLE);
+    menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(hwnd) != NULL);
+    WIN_AdjustWindowRectWithStyle(window, style, menu, x, y, width, height, use_current);
 }
 
 static void

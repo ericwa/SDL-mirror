@@ -749,7 +749,7 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 constrain_max_size = FALSE;
             }
 
-            /* Convert w/h from points of the client rect only, to pixels including the frame. */
+            /* Expand w/h to include the frame. */
             unused_x = 0;
             unused_y = 0;
             WIN_AdjustWindowRect_SpecifiedRect(data->window, &unused_x, &unused_y, &w, &h);
