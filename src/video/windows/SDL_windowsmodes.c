@@ -424,15 +424,18 @@ static void
 WIN_LogMonitor(_THIS, HMONITOR mon)
 {
     const SDL_VideoData *vid_data = (const SDL_VideoData *)_this->driverdata;
-    MONITORINFOEXA minfo;
+    MONITORINFOEX minfo;
     UINT xdpi = 0, ydpi = 0;
+    char *name_utf8;
 
     if (vid_data->GetDpiForMonitor)
         vid_data->GetDpiForMonitor(mon, MDT_EFFECTIVE_DPI, &xdpi, &ydpi);
 
     SDL_zero(minfo);
     minfo.cbSize = sizeof(minfo);
-    GetMonitorInfoA(mon, &minfo);
+    GetMonitorInfo(mon, &minfo);
+
+    name_utf8 = WIN_StringToUTF8(minfo.szDevice);
 
     SDL_Log("monitor \"%s\" dpi: %d. (%d, %d), %dx%d pixels",
         minfo.szDevice,
@@ -441,6 +444,8 @@ WIN_LogMonitor(_THIS, HMONITOR mon)
         minfo.rcMonitor.top,
         minfo.rcMonitor.right - minfo.rcMonitor.left,
         minfo.rcMonitor.bottom - minfo.rcMonitor.top);
+
+    SDL_free(name_utf8);
 }
 
 int

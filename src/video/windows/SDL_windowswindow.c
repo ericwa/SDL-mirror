@@ -723,8 +723,6 @@ WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, 
     }
 
     if (fullscreen) {
-		float xdpi, ydpi;
-
         x = minfo.rcMonitor.left;
         y = minfo.rcMonitor.top;
         w = minfo.rcMonitor.right - minfo.rcMonitor.left;
