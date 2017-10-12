@@ -85,10 +85,10 @@ extern void WIN_OnWindowEnter(_THIS, SDL_Window * window);
 extern void WIN_UpdateClipCursor(SDL_Window *window);
 extern int WIN_SetWindowHitTest(SDL_Window *window, SDL_bool enabled);
 extern void WIN_GetDrawableSize(const SDL_Window *window, int *w, int *h);
-extern void WIN_PhysicalToVirtual_ClientPoint(const SDL_Window *window, int *w, int *h);
-extern void WIN_VirtualToPhysical_ClientPoint(const SDL_Window *window, int *w, int *h);
-extern void WIN_VirtualToPhysical_ScreenPoint(int *x, int *y, int widthHint, int heightHint);
-extern void WIN_PhysicalToVirtual_ScreenPoint(int *x, int *y, int widthHint, int heightHint);
+extern void WIN_ClientPointFromPixels(const SDL_Window *window, int *w, int *h);
+extern void WIN_ClientPointToPixels(const SDL_Window *window, int *w, int *h);
+extern void WIN_ScreenPointToPixels(int *x, int *y, int widthHint, int heightHint);
+extern void WIN_ScreenPointFromPixels(int *x, int *y, int widthHint, int heightHint);
 
 #endif /* SDL_windowswindow_h_ */
 

@@ -134,11 +134,11 @@ WIN_AdjustWindowRectWithStyle(SDL_Window *window, DWORD style, BOOL menu, int *x
 
     w_pixels = width_points;
     h_pixels = height_points;
-    WIN_VirtualToPhysical_ClientPoint(window, &w_pixels, &h_pixels);
+    WIN_ClientPointToPixels(window, &w_pixels, &h_pixels);
 
     x_pixels = x_points;
     y_pixels = y_points;
-    WIN_VirtualToPhysical_ScreenPoint(&x_pixels, &y_pixels, width_points, height_points);
+    WIN_ScreenPointToPixels(&x_pixels, &y_pixels, width_points, height_points);
 
     WIN_AdjustWindowRectWithStyle_SpecifiedRect(window, style, menu, &x_pixels, &y_pixels, &w_pixels, &h_pixels);
 
@@ -310,7 +310,7 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, HWND parent, SDL_bool cre
         if (GetClientRect(hwnd, &rect)) {
             int w = rect.right;
             int h = rect.bottom;
-            WIN_PhysicalToVirtual_ClientPoint(window, &w, &h);
+            WIN_ClientPointFromPixels(window, &w, &h);
             if ((window->w && window->w != w) || (window->h && window->h != h)) {
                 /* We tried to create a window larger than the desktop and Windows didn't allow it.  Override! */
                 int x, y;
@@ -332,7 +332,7 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, HWND parent, SDL_bool cre
         if (ClientToScreen(hwnd, &point)) {
             int x = point.x;
             int y = point.y;
-            WIN_PhysicalToVirtual_ScreenPoint(&x, &y, window->w, window->h);
+            WIN_ScreenPointFromPixels(&x, &y, window->w, window->h);
             window->x = x;
             window->y = y;
         }
@@ -1059,7 +1059,7 @@ WIN_GetDrawableSize(const SDL_Window *window, int *w, int *h)
 }
 
 void
-WIN_PhysicalToVirtual_ClientPoint(const SDL_Window *window, int *x, int *y)
+WIN_ClientPointFromPixels(const SDL_Window *window, int *x, int *y)
 {
     const SDL_WindowData *data = ((SDL_WindowData *)window->driverdata);
 
@@ -1068,7 +1068,7 @@ WIN_PhysicalToVirtual_ClientPoint(const SDL_Window *window, int *x, int *y)
 }
 
 void
-WIN_VirtualToPhysical_ClientPoint(const SDL_Window *window, int *x, int *y)
+WIN_ClientPointToPixels(const SDL_Window *window, int *x, int *y)
 {
     const SDL_WindowData *data = ((SDL_WindowData *)window->driverdata);
 
@@ -1156,7 +1156,7 @@ WIN_DPIAtScreenPoint(int x, int y, int widthHint, int heightHint, UINT *dpi, REC
 }
 
 /* Convert an SDL to a Windows screen coordinate. */
-void WIN_VirtualToPhysical_ScreenPoint(int *x, int *y, int widthHint, int heightHint)
+void WIN_ScreenPointToPixels(int *x, int *y, int widthHint, int heightHint)
 {
     RECT monitorRectScaled, monitorRectUnscaled;
     UINT dpi;
@@ -1181,7 +1181,7 @@ void WIN_VirtualToPhysical_ScreenPoint(int *x, int *y, int widthHint, int height
 }
 
 /* Converts a Windows screen coordinate to an SDL one. */
-void WIN_PhysicalToVirtual_ScreenPoint(int *x, int *y, int widthHint, int heightHint)
+void WIN_ScreenPointFromPixels(int *x, int *y, int widthHint, int heightHint)
 {
     RECT monitorRectScaled, monitorRectUnscaled;
     UINT dpi;

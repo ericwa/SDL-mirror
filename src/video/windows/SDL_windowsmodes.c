@@ -369,7 +369,7 @@ WIN_GetDisplayBoundsInternal(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect,
     y = rect_pixels->top;
     w = rect_pixels->right - rect_pixels->left;
     h = rect_pixels->bottom - rect_pixels->top;
-    WIN_PhysicalToVirtual_ScreenPoint(&x, &y, w, h);
+    WIN_ScreenPointFromPixels(&x, &y, w, h);
 
     w = MulDiv(w, 96, hdpi);
     h = MulDiv(h, 96, vdpi);
