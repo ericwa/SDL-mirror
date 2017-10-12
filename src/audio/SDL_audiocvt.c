@@ -484,8 +484,9 @@ SDL_ResampleAudio(const int chans, const int inrate, const int outrate,
                         const float *inbuf, const int inbuflen,
                         float *outbuf, const int outbuflen)
 {
-    const float outtimeincr = 1.0f / ((float) outrate);
-    const float ratio = ((float) outrate) / ((float) inrate);
+    const double finrate = (double) inrate;
+    const double outtimeincr = 1.0 / ((float) outrate);
+    const double  ratio = ((float) outrate) / ((float) inrate);
     const int paddinglen = ResamplerPadding(inrate, outrate);
     const int framelen = chans * (int)sizeof (float);
     const int inframes = inbuflen / framelen;
@@ -493,18 +494,16 @@ SDL_ResampleAudio(const int chans, const int inrate, const int outrate,
     const int maxoutframes = outbuflen / framelen;
     const int outframes = SDL_min(wantedoutframes, maxoutframes);
     float *dst = outbuf;
-    float outtime = 0.0f;
+    double outtime = 0.0;
     int i, j, chan;
 
     for (i = 0; i < outframes; i++) {
         const int srcindex = (int) (outtime * inrate);
-        const float finrate = (float) inrate;
-        const float intime = ((float) srcindex) / finrate;
-        const float innexttime = ((float) (srcindex + 1)) / finrate;
-
-        const float interpolation1 = 1.0f - (innexttime - outtime) / (innexttime - intime);
+        const double intime = ((double) srcindex) / finrate;
+        const double innexttime = ((double) (srcindex + 1)) / finrate;
+        const double interpolation1 = 1.0 - ((innexttime - outtime) / (innexttime - intime));
         const int filterindex1 = (int) (interpolation1 * RESAMPLER_SAMPLES_PER_ZERO_CROSSING);
-        const float interpolation2 = 1.0f - interpolation1;
+        const double interpolation2 = 1.0 - interpolation1;
         const int filterindex2 = (int) (interpolation2 * RESAMPLER_SAMPLES_PER_ZERO_CROSSING);
 
         for (chan = 0; chan < chans; chan++) {
@@ -722,18 +721,17 @@ SDL_ResampleCVT(SDL_AudioCVT *cvt, const int chans, const SDL_AudioFormat format
     SDL_assert(format == AUDIO_F32SYS);
 
     /* we keep no streaming state here, so pad with silence on both ends. */
-    padding = SDL_stack_alloc(float, paddingsamples);
+    padding = (float *) SDL_calloc(paddingsamples, sizeof (float));
     if (!padding) {
         SDL_OutOfMemory();
         return;
     }
-    SDL_memset(padding, '\0', paddingsamples * sizeof (float));
 
     cvt->len_cvt = SDL_ResampleAudio(chans, inrate, outrate, padding, padding, src, srclen, dst, dstlen);
 
-    SDL_stack_free(padding);
+    SDL_free(padding);
 
-    SDL_memcpy(cvt->buf, dst, cvt->len_cvt);  /* !!! FIXME: remove this if we can get the resampler to work in-place again. */
+    SDL_memmove(cvt->buf, dst, cvt->len_cvt);  /* !!! FIXME: remove this if we can get the resampler to work in-place again. */
 
     if (cvt->filters[++cvt->filter_index]) {
         cvt->filters[cvt->filter_index](cvt, format);
@@ -1225,6 +1223,7 @@ SDL_ResampleAudioStream(SDL_AudioStream *stream, const void *_inbuf, const int i
     const int paddingbytes = paddingsamples * sizeof (float);
     float *lpadding = (float *) stream->resampler_state;
     const float *rpadding = (const float *) inbufend; /* we set this up so there are valid padding samples at the end of the input buffer. */
+    const int cpy = SDL_min(inbuflen, paddingbytes);
     int retval;
 
     SDL_assert(inbuf != ((const float *) outbuf));  /* SDL_AudioStreamPut() shouldn't allow in-place resamples. */
@@ -1232,7 +1231,7 @@ SDL_ResampleAudioStream(SDL_AudioStream *stream, const void *_inbuf, const int i
     retval = SDL_ResampleAudio(chans, inrate, outrate, lpadding, rpadding, inbuf, inbuflen, outbuf, outbuflen);
 
     /* update our left padding with end of current input, for next run. */
-    SDL_memcpy(lpadding, inbufend - paddingbytes, paddingbytes);
+    SDL_memcpy((lpadding + paddingsamples) - (cpy / sizeof (float)), inbufend - cpy, cpy);
     return retval;
 }
 
@@ -1357,7 +1356,7 @@ SDL_AudioStreamPut(SDL_AudioStream *stream, const void *buf, const Uint32 _bufle
     Uint8 *workbuf;
     Uint8 *resamplebuf = NULL;
     int resamplebuflen = 0;
-    const int neededpaddingbytes = stream ? stream->resampler_padding_samples * sizeof (float) : 0;
+    int neededpaddingbytes;
     int paddingbytes;
 
     /* !!! FIXME: several converters can take advantage of SIMD, but only
@@ -1380,11 +1379,12 @@ SDL_AudioStreamPut(SDL_AudioStream *stream, const void *buf, const Uint32 _bufle
         return 0;  /* nothing to do. */
     } else if ((buflen % stream->src_sample_frame_size) != 0) {
         return SDL_SetError("Can't add partial sample frames");
-    } else if (buflen < (neededpaddingbytes * 2)) {
+    } else if (buflen < ((stream->resampler_padding_samples / stream->pre_resample_channels) * stream->src_sample_frame_size)) {
         return SDL_SetError("Need to put a larger buffer");
     }
 
     /* no padding prepended on first run. */
+    neededpaddingbytes = stream->resampler_padding_samples * sizeof (float);
     paddingbytes = stream->first_run ? 0 : neededpaddingbytes;
     stream->first_run = SDL_FALSE;
 
@@ -1462,14 +1462,19 @@ SDL_AudioStreamPut(SDL_AudioStream *stream, const void *buf, const Uint32 _bufle
         SDL_memcpy(stream->resampler_padding, workbuf + (buflen - neededpaddingbytes), neededpaddingbytes);
 
         resamplebuf = workbuf + buflen;  /* skip to second piece of workbuf. */
-        buflen = stream->resampler_func(stream, workbuf, buflen - neededpaddingbytes, resamplebuf, resamplebuflen);
+        SDL_assert(buflen >= neededpaddingbytes);
+        if (buflen > neededpaddingbytes) {
+            buflen = stream->resampler_func(stream, workbuf, buflen - neededpaddingbytes, resamplebuf, resamplebuflen);
+        } else {
+            buflen = 0;
+        }
 
         #if DEBUG_AUDIOSTREAM
         printf("AUDIOSTREAM: After resampling we have %d bytes\n", buflen);
         #endif
     }
 
-    if (stream->cvt_after_resampling.needed) {
+    if (stream->cvt_after_resampling.needed && (buflen > 0)) {
         stream->cvt_after_resampling.buf = resamplebuf;
         stream->cvt_after_resampling.len = buflen;
         if (SDL_ConvertAudio(&stream->cvt_after_resampling) == -1) {
@@ -1487,7 +1492,7 @@ SDL_AudioStreamPut(SDL_AudioStream *stream, const void *buf, const Uint32 _bufle
     #endif
 
     /* resamplebuf holds the final output, even if we didn't resample. */
-    return SDL_WriteToDataQueue(stream->queue, resamplebuf, buflen);
+    return buflen ? SDL_WriteToDataQueue(stream->queue, resamplebuf, buflen) : 0;
 }
 
 void
