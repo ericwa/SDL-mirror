@@ -810,7 +810,9 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
             x = point.x;
             y = point.y;
-            WIN_ScreenPointFromPixels(&x, &y, rect.right, rect.bottom);
+            w = rect.right;
+            h = rect.bottom;
+            WIN_ScreenRectFromPixels(&x, &y, &w, &h);
 
             SDL_SendWindowEvent(data->window, SDL_WINDOWEVENT_MOVED, x, y);
 

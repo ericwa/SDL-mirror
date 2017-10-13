@@ -87,8 +87,8 @@ extern int WIN_SetWindowHitTest(SDL_Window *window, SDL_bool enabled);
 extern void WIN_GetDrawableSize(const SDL_Window *window, int *w, int *h);
 extern void WIN_ClientPointFromPixels(const SDL_Window *window, int *w, int *h);
 extern void WIN_ClientPointToPixels(const SDL_Window *window, int *w, int *h);
-extern void WIN_ScreenPointToPixels(int *x, int *y, int widthHint, int heightHint);
-extern void WIN_ScreenPointFromPixels(int *x, int *y, int widthHint, int heightHint);
+extern void WIN_ScreenRectToPixels(int *x, int *y, int *w, int *h);
+extern void WIN_ScreenRectFromPixels(int *x, int *y, int *w, int *h);
 
 #endif /* SDL_windowswindow_h_ */
 

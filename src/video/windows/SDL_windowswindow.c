@@ -132,13 +132,20 @@ WIN_AdjustWindowRectWithStyle(SDL_Window *window, DWORD style, BOOL menu, int *x
     const int width_points = (use_current ? window->w : window->windowed.w);
     const int height_points = (use_current ? window->h : window->windowed.h);
 
+    x_pixels = x_points;
+    y_pixels = y_points;
+    w_pixels = width_points;
+    h_pixels = height_points;
+    WIN_ScreenRectToPixels(&x_pixels, &y_pixels, &w_pixels, &h_pixels);
+
+    /* NOTE: we don't use the width/height returned by WIN_ScreenRectToPixels,
+       (which is making a guess of which monitor the rect is considered to be on)
+       but instead calculate width/height using WIN_ClientPointToPixels 
+       which is using the DPI values that Windows considers the window to have.
+     */
     w_pixels = width_points;
     h_pixels = height_points;
     WIN_ClientPointToPixels(window, &w_pixels, &h_pixels);
-
-    x_pixels = x_points;
-    y_pixels = y_points;
-    WIN_ScreenPointToPixels(&x_pixels, &y_pixels, width_points, height_points);
 
     WIN_AdjustWindowRectWithStyle_SpecifiedRect(window, style, menu, &x_pixels, &y_pixels, &w_pixels, &h_pixels);
 
@@ -326,13 +333,16 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, HWND parent, SDL_bool cre
         }
     }
     {
+        RECT rect;
         POINT point;
         point.x = 0;
         point.y = 0;
-        if (ClientToScreen(hwnd, &point)) {
+        if (ClientToScreen(hwnd, &point) && GetClientRect(hwnd, &rect)) {
             int x = point.x;
             int y = point.y;
-            WIN_ScreenPointFromPixels(&x, &y, window->w, window->h);
+            int w = rect.right;
+            int h = rect.bottom;
+            WIN_ScreenRectFromPixels(&x, &y, &w, &h);
             window->x = x;
             window->y = y;
         }
@@ -1156,13 +1166,16 @@ WIN_DPIAtScreenPoint(int x, int y, int widthHint, int heightHint, UINT *dpi, REC
 }
 
 /* Convert an SDL to a Windows screen coordinate. */
-void WIN_ScreenPointToPixels(int *x, int *y, int widthHint, int heightHint)
+void WIN_ScreenRectToPixels(int *x, int *y, int *w, int *h)
 {
     RECT monitorRectScaled, monitorRectUnscaled;
     UINT dpi;
     SDL_bool uniformDPI;
 
-    WIN_DPIAtScreenPoint(*x, *y, widthHint, heightHint, &dpi, &monitorRectScaled, &monitorRectUnscaled, &uniformDPI);
+    WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorRectScaled, &monitorRectUnscaled, &uniformDPI);
+
+    *w = MulDiv(*w, dpi, 96);
+    *h = MulDiv(*h, dpi, 96);
 
     if (uniformDPI) {
         *x = MulDiv(*x, dpi, 96);
@@ -1181,13 +1194,16 @@ void WIN_ScreenPointToPixels(int *x, int *y, int widthHint, int heightHint)
 }
 
 /* Converts a Windows screen coordinate to an SDL one. */
-void WIN_ScreenPointFromPixels(int *x, int *y, int widthHint, int heightHint)
+void WIN_ScreenRectFromPixels(int *x, int *y, int *w, int *h)
 {
     RECT monitorRectScaled, monitorRectUnscaled;
     UINT dpi;
     SDL_bool uniformDPI;
 
-    WIN_DPIAtScreenPoint(*x, *y, widthHint, heightHint, &dpi, &monitorRectScaled, &monitorRectUnscaled, &uniformDPI);
+    WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorRectScaled, &monitorRectUnscaled, &uniformDPI);
+
+    *w = MulDiv(*w, 96, dpi);
+    *h = MulDiv(*h, 96, dpi);
 
     if (uniformDPI) {
         *x = MulDiv(*x, 96, dpi);
