@@ -824,7 +824,7 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                                 h);
 
 #ifdef HIGHDPI_DEBUG
-            SDL_Log("WM_WINDOWPOSCHANGED: physical client rect: (%d, %d) (%d x %d) virtual client rect: (%d, %d) (%d x %d)\n", 
+            SDL_Log("WM_WINDOWPOSCHANGED: client rect, pixels: (%d, %d) (%d x %d) client rect, points: (%d, %d) (%d x %d)\n", 
                 point.x, point.y, rect.right, rect.bottom,
                 x, y, w, h);
 #endif
