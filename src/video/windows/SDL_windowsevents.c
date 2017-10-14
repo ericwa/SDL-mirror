@@ -788,7 +788,6 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_WINDOWPOSCHANGED:
         {
             RECT rect;
-            POINT point;
             int x, y;
             int w, h;
 
@@ -799,23 +798,22 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             if (!GetClientRect(hwnd, &rect) || IsRectEmpty(&rect)) {
                 break;
             }
-            // NOTE: doing ClientToScreen on both corners of the rect
-            // can give bogus results if the window is stradding 2 screens
-            
-            point.x = 0;
-            point.y = 0;
-            ClientToScreen(hwnd, &point);
+            ClientToScreen(hwnd, (LPPOINT)& rect);
+            ClientToScreen(hwnd, (LPPOINT)& rect + 1);
 
             WIN_UpdateClipCursor(data->window);
 
-            x = point.x;
-            y = point.y;
-            w = rect.right;
-            h = rect.bottom;
+            x = rect.left;
+            y = rect.top;
+            w = rect.right - rect.left;
+            h = rect.bottom - rect.top;
             WIN_ScreenRectFromPixels(&x, &y, &w, &h);
 
             SDL_SendWindowEvent(data->window, SDL_WINDOWEVENT_MOVED, x, y);
 
+            /* NOTE: important to convert w/h from points -> pixels using 
+               WIN_ClientPointFromPixels, which uses the window's actual
+               DPI value, rather than WIN_ScreenRectFromPixels which guesses. */
             w = rect.right - rect.left;
             h = rect.bottom - rect.top;
             WIN_ClientPointFromPixels(data->window, &w, &h);
@@ -825,7 +823,7 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 #ifdef HIGHDPI_DEBUG
             SDL_Log("WM_WINDOWPOSCHANGED: client rect, pixels: (%d, %d) (%d x %d) client rect, points: (%d, %d) (%d x %d)\n", 
-                point.x, point.y, rect.right, rect.bottom,
+                rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
                 x, y, w, h);
 #endif
 
