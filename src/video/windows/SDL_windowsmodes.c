@@ -425,7 +425,7 @@ WIN_LogMonitor(_THIS, HMONITOR mon)
 
     SDL_zero(minfo);
     minfo.cbSize = sizeof(minfo);
-    GetMonitorInfo(mon, &minfo);
+    GetMonitorInfo(mon, (LPMONITORINFO)&minfo);
 
     name_utf8 = WIN_StringToUTF8(minfo.szDevice);
 
