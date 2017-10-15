@@ -395,7 +395,7 @@ sets `uniformDPI` to SDL_TRUE and returns the value in `dpi`.
 Otherwise, `uniformDPI` is set to SDL_FALSE and the DPI and rects are returned.
 */
 static void
-WIN_DPIAtScreenPoint(int x, int y, int widthHint, int heightHint, UINT *dpi, RECT *monRectScaled, RECT *monRectUnscaled, SDL_bool *uniformDPI)
+WIN_DPIAtScreenPoint(int x, int y, int widthHint, int heightHint, UINT *dpi, RECT *monRect_points, RECT *monRect_pixels, SDL_bool *uniformDPI)
 {
     HMONITOR monitor = NULL;
     HRESULT result;
@@ -452,27 +452,27 @@ WIN_DPIAtScreenPoint(int x, int y, int widthHint, int heightHint, UINT *dpi, REC
     }
 
     *uniformDPI = SDL_FALSE;
-    *monRectUnscaled = moninfo.rcMonitor;
-    *monRectScaled = moninfo.rcMonitor;
+    *monRect_pixels = moninfo.rcMonitor;
+    *monRect_points = moninfo.rcMonitor;
 
-    /* fix up the right/bottom of the scaled rect */
+    /* fix up the right/bottom of the "points" rect */
     w = moninfo.rcMonitor.right - moninfo.rcMonitor.left;
     h = moninfo.rcMonitor.bottom - moninfo.rcMonitor.top;
     w = MulDiv(w, 96, *dpi);
     h = MulDiv(h, 96, *dpi);
 
-    monRectScaled->right = monRectScaled->left + w;
-    monRectScaled->bottom = monRectScaled->top + h;
+    monRect_points->right = monRect_points->left + w;
+    monRect_points->bottom = monRect_points->top + h;
 }
 
 /* Convert an SDL to a Windows screen coordinate. */
 void WIN_ScreenRectToPixels(int *x, int *y, int *w, int *h)
 {
-    RECT monitorRectScaled, monitorRectUnscaled;
+    RECT monitorRect_points, monitorRect_pixels;
     UINT dpi;
     SDL_bool uniformDPI;
 
-    WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorRectScaled, &monitorRectUnscaled, &uniformDPI);
+    WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorRect_points, &monitorRect_pixels, &uniformDPI);
 
     *w = MulDiv(*w, dpi, 96);
     *h = MulDiv(*h, dpi, 96);
@@ -483,24 +483,24 @@ void WIN_ScreenRectToPixels(int *x, int *y, int *w, int *h)
         return;
     }
 
-    *x = monitorRectScaled.left + MulDiv(*x - monitorRectScaled.left, dpi, 96);
-    *y = monitorRectScaled.top + MulDiv(*y - monitorRectScaled.top, dpi, 96);
+    *x = monitorRect_points.left + MulDiv(*x - monitorRect_points.left, dpi, 96);
+    *y = monitorRect_points.top + MulDiv(*y - monitorRect_points.top, dpi, 96);
 
     /* ensure the result is not past the right/bottom of the monitor rect */
-    if (*x >= monitorRectUnscaled.right)
-        *x = monitorRectUnscaled.right - 1;
-    if (*y >= monitorRectUnscaled.bottom)
-        *y = monitorRectUnscaled.bottom - 1;
+    if (*x >= monitorRect_pixels.right)
+        *x = monitorRect_pixels.right - 1;
+    if (*y >= monitorRect_pixels.bottom)
+        *y = monitorRect_pixels.bottom - 1;
 }
 
 /* Converts a Windows screen coordinate to an SDL one. */
 void WIN_ScreenRectFromPixels(int *x, int *y, int *w, int *h)
 {
-    RECT monitorRectScaled, monitorRectUnscaled;
+    RECT monitorRect_points, monitorRect_pixels;
     UINT dpi;
     SDL_bool uniformDPI;
 
-    WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorRectScaled, &monitorRectUnscaled, &uniformDPI);
+    WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorRect_points, &monitorRect_pixels, &uniformDPI);
 
     *w = MulDiv(*w, 96, dpi);
     *h = MulDiv(*h, 96, dpi);
@@ -511,8 +511,8 @@ void WIN_ScreenRectFromPixels(int *x, int *y, int *w, int *h)
         return;
     }
 
-    *x = monitorRectUnscaled.left + MulDiv(*x - monitorRectUnscaled.left, 96, dpi);
-    *y = monitorRectUnscaled.top + MulDiv(*y - monitorRectUnscaled.top, 96, dpi);
+    *x = monitorRect_pixels.left + MulDiv(*x - monitorRect_pixels.left, 96, dpi);
+    *y = monitorRect_pixels.top + MulDiv(*y - monitorRect_pixels.top, 96, dpi);
 }
 
 void
