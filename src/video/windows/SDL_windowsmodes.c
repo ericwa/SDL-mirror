@@ -386,6 +386,135 @@ WIN_GetDisplayUsableBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
     return WIN_GetDisplayBoundsInternal(_this, display, rect, SDL_TRUE);
 }
 
+/* Given a point in screen coordinates (they're interpreted as Windows coordinates)
+tries to guess what DPI and which monitor Windows would assign a window located there.
+
+If the system has a uniform DPI value on all monitors (or DPI awareness is disabled),
+sets `uniformDPI` to SDL_TRUE and returns the value in `dpi`.
+
+Otherwise, `uniformDPI` is set to SDL_FALSE and the DPI and rects are returned.
+*/
+static void
+WIN_DPIAtScreenPoint(int x, int y, int widthHint, int heightHint, UINT *dpi, RECT *monRectScaled, RECT *monRectUnscaled, SDL_bool *uniformDPI)
+{
+    HMONITOR monitor = NULL;
+    HRESULT result;
+    MONITORINFO moninfo = { 0 };
+    const SDL_VideoData *videodata;
+    const SDL_VideoDevice *videodevice;
+    RECT clientRect;
+    UINT unused;
+    int w, h;
+
+    /* non-DPI-aware return values */
+    *uniformDPI = SDL_TRUE;
+    *dpi = 96;
+
+    videodevice = SDL_GetVideoDevice();
+    if (!videodevice || !videodevice->driverdata)
+        return;
+
+    videodata = (SDL_VideoData *)videodevice->driverdata;
+    if (!videodata->highdpi_enabled)
+        return;
+
+    /* Check for Windows < 8.1*/
+    if (!videodata->GetDpiForMonitor) {
+        HDC hdc = GetDC(NULL);
+        if (hdc) {
+            *dpi = GetDeviceCaps(hdc, LOGPIXELSX);
+            ReleaseDC(NULL, hdc);
+        }
+        return;
+    }
+
+    /* General case: Windows 8.1+ */
+
+    clientRect.left = x;
+    clientRect.top = y;
+    clientRect.right = x + widthHint;
+    clientRect.bottom = y + heightHint;
+
+    monitor = MonitorFromRect(&clientRect, MONITOR_DEFAULTTONEAREST);
+
+    result = videodata->GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, dpi, &unused);
+    if (result != S_OK) {
+        /* Shouldn't happen? */
+        *dpi = 96;
+        return;
+    }
+
+    moninfo.cbSize = sizeof(MONITORINFO);
+    if (!GetMonitorInfo(monitor, &moninfo)) {
+        /* Shouldn't happen? */
+        *dpi = 96;
+        return;
+    }
+
+    *uniformDPI = SDL_FALSE;
+    *monRectUnscaled = moninfo.rcMonitor;
+    *monRectScaled = moninfo.rcMonitor;
+
+    /* fix up the right/bottom of the scaled rect */
+    w = moninfo.rcMonitor.right - moninfo.rcMonitor.left;
+    h = moninfo.rcMonitor.bottom - moninfo.rcMonitor.top;
+    w = MulDiv(w, 96, *dpi);
+    h = MulDiv(h, 96, *dpi);
+
+    monRectScaled->right = monRectScaled->left + w;
+    monRectScaled->bottom = monRectScaled->top + h;
+}
+
+/* Convert an SDL to a Windows screen coordinate. */
+void WIN_ScreenRectToPixels(int *x, int *y, int *w, int *h)
+{
+    RECT monitorRectScaled, monitorRectUnscaled;
+    UINT dpi;
+    SDL_bool uniformDPI;
+
+    WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorRectScaled, &monitorRectUnscaled, &uniformDPI);
+
+    *w = MulDiv(*w, dpi, 96);
+    *h = MulDiv(*h, dpi, 96);
+
+    if (uniformDPI) {
+        *x = MulDiv(*x, dpi, 96);
+        *y = MulDiv(*y, dpi, 96);
+        return;
+    }
+
+    *x = monitorRectScaled.left + MulDiv(*x - monitorRectScaled.left, dpi, 96);
+    *y = monitorRectScaled.top + MulDiv(*y - monitorRectScaled.top, dpi, 96);
+
+    /* ensure the result is not past the right/bottom of the monitor rect */
+    if (*x >= monitorRectUnscaled.right)
+        *x = monitorRectUnscaled.right - 1;
+    if (*y >= monitorRectUnscaled.bottom)
+        *y = monitorRectUnscaled.bottom - 1;
+}
+
+/* Converts a Windows screen coordinate to an SDL one. */
+void WIN_ScreenRectFromPixels(int *x, int *y, int *w, int *h)
+{
+    RECT monitorRectScaled, monitorRectUnscaled;
+    UINT dpi;
+    SDL_bool uniformDPI;
+
+    WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorRectScaled, &monitorRectUnscaled, &uniformDPI);
+
+    *w = MulDiv(*w, 96, dpi);
+    *h = MulDiv(*h, 96, dpi);
+
+    if (uniformDPI) {
+        *x = MulDiv(*x, 96, dpi);
+        *y = MulDiv(*y, 96, dpi);
+        return;
+    }
+
+    *x = monitorRectUnscaled.left + MulDiv(*x - monitorRectUnscaled.left, 96, dpi);
+    *y = monitorRectUnscaled.top + MulDiv(*y - monitorRectUnscaled.top, 96, dpi);
+}
+
 void
 WIN_GetDisplayModes(_THIS, SDL_VideoDisplay * display)
 {
