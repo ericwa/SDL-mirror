@@ -389,13 +389,10 @@ WIN_GetDisplayUsableBounds(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect)
 /* Given a point in screen coordinates (they're interpreted as Windows coordinates)
 tries to guess what DPI and which monitor Windows would assign a window located there.
 
-If the system has a uniform DPI value on all monitors (or DPI awareness is disabled),
-sets `uniformDPI` to SDL_TRUE and returns the value in `dpi`.
-
-Otherwise, `uniformDPI` is set to SDL_FALSE and the DPI and rects are returned.
+returns 0 on success
 */
-static void
-WIN_DPIAtScreenPoint(int x, int y, int width_hint, int height_hint, UINT *dpi, RECT *monitorrect_points, RECT *monitorrect_pixels, SDL_bool *uniformDPI)
+static int
+WIN_DPIAtScreenPoint(int x, int y, int width_hint, int height_hint, UINT *dpi, RECT *monitorrect_points, RECT *monitorrect_pixels)
 {
     HMONITOR monitor = NULL;
     HRESULT result;
@@ -406,27 +403,13 @@ WIN_DPIAtScreenPoint(int x, int y, int width_hint, int height_hint, UINT *dpi, R
     UINT unused;
     int w, h;
 
-    /* non-DPI-aware return values */
-    *uniformDPI = SDL_TRUE;
-    *dpi = 96;
-
     videodevice = SDL_GetVideoDevice();
     if (!videodevice || !videodevice->driverdata)
-        return;
+        return SDL_SetError("no video device");
 
     videodata = (SDL_VideoData *)videodevice->driverdata;
     if (!videodata->highdpi_enabled)
-        return;
-
-    /* Check for Windows < 8.1*/
-    if (!videodata->GetDpiForMonitor) {
-        HDC hdc = GetDC(NULL);
-        if (hdc) {
-            *dpi = GetDeviceCaps(hdc, LOGPIXELSX);
-            ReleaseDC(NULL, hdc);
-        }
-        return;
-    }
+        return 1;
 
     /* General case: Windows 8.1+ */
 
@@ -437,21 +420,27 @@ WIN_DPIAtScreenPoint(int x, int y, int width_hint, int height_hint, UINT *dpi, R
 
     monitor = MonitorFromRect(&clientRect, MONITOR_DEFAULTTONEAREST);
 
-    result = videodata->GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, dpi, &unused);
-    if (result != S_OK) {
-        /* Shouldn't happen? */
-        *dpi = 96;
-        return;
+    /* Check for Windows < 8.1*/
+    if (!videodata->GetDpiForMonitor) {
+        HDC hdc = GetDC(NULL);
+        if (hdc) {
+            *dpi = GetDeviceCaps(hdc, LOGPIXELSX);
+            ReleaseDC(NULL, hdc);
+        }
+    } else {
+        result = videodata->GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, dpi, &unused);
+        if (result != S_OK) {
+            /* Shouldn't happen? */
+            return SDL_SetError("GetDpiForMonitor failed");
+        }
     }
 
     moninfo.cbSize = sizeof(MONITORINFO);
     if (!GetMonitorInfo(monitor, &moninfo)) {
         /* Shouldn't happen? */
-        *dpi = 96;
-        return;
+        return SDL_SetError("GetMonitorInfo failed");
     }
 
-    *uniformDPI = SDL_FALSE;
     *monitorrect_pixels = moninfo.rcMonitor;
     *monitorrect_points = moninfo.rcMonitor;
 
@@ -463,6 +452,8 @@ WIN_DPIAtScreenPoint(int x, int y, int width_hint, int height_hint, UINT *dpi, R
 
     monitorrect_points->right = monitorrect_points->left + w;
     monitorrect_points->bottom = monitorrect_points->top + h;
+
+    return 0;
 }
 
 /* Convert an SDL to a Windows screen coordinate. */
@@ -470,27 +461,20 @@ void WIN_ScreenRectToPixels(int *x, int *y, int *w, int *h)
 {
     RECT monitorrect_points, monitorrect_pixels;
     UINT dpi;
-    SDL_bool uniformDPI;
 
-    WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorrect_points, &monitorrect_pixels, &uniformDPI);
+    if (WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorrect_points, &monitorrect_pixels) == 0) {
+        *w = MulDiv(*w, dpi, 96);
+        *h = MulDiv(*h, dpi, 96);
 
-    *w = MulDiv(*w, dpi, 96);
-    *h = MulDiv(*h, dpi, 96);
+        *x = monitorrect_points.left + MulDiv(*x - monitorrect_points.left, dpi, 96);
+        *y = monitorrect_points.top + MulDiv(*y - monitorrect_points.top, dpi, 96);
 
-    if (uniformDPI) {
-        *x = MulDiv(*x, dpi, 96);
-        *y = MulDiv(*y, dpi, 96);
-        return;
+        /* ensure the result is not past the right/bottom of the monitor rect */
+        if (*x >= monitorrect_pixels.right)
+            *x = monitorrect_pixels.right - 1;
+        if (*y >= monitorrect_pixels.bottom)
+            *y = monitorrect_pixels.bottom - 1;
     }
-
-    *x = monitorrect_points.left + MulDiv(*x - monitorrect_points.left, dpi, 96);
-    *y = monitorrect_points.top + MulDiv(*y - monitorrect_points.top, dpi, 96);
-
-    /* ensure the result is not past the right/bottom of the monitor rect */
-    if (*x >= monitorrect_pixels.right)
-        *x = monitorrect_pixels.right - 1;
-    if (*y >= monitorrect_pixels.bottom)
-        *y = monitorrect_pixels.bottom - 1;
 }
 
 /* Converts a Windows screen coordinate to an SDL one. */
@@ -498,21 +482,14 @@ void WIN_ScreenRectFromPixels(int *x, int *y, int *w, int *h)
 {
     RECT monitorrect_points, monitorrect_pixels;
     UINT dpi;
-    SDL_bool uniformDPI;
+    
+    if (WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorrect_points, &monitorrect_pixels) == 0) {
+        *w = MulDiv(*w, 96, dpi);
+        *h = MulDiv(*h, 96, dpi);
 
-    WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorrect_points, &monitorrect_pixels, &uniformDPI);
-
-    *w = MulDiv(*w, 96, dpi);
-    *h = MulDiv(*h, 96, dpi);
-
-    if (uniformDPI) {
-        *x = MulDiv(*x, 96, dpi);
-        *y = MulDiv(*y, 96, dpi);
-        return;
+        *x = monitorrect_pixels.left + MulDiv(*x - monitorrect_pixels.left, 96, dpi);
+        *y = monitorrect_pixels.top + MulDiv(*y - monitorrect_pixels.top, 96, dpi);
     }
-
-    *x = monitorrect_pixels.left + MulDiv(*x - monitorrect_pixels.left, 96, dpi);
-    *y = monitorrect_pixels.top + MulDiv(*y - monitorrect_pixels.top, 96, dpi);
 }
 
 void
