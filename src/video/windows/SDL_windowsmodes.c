@@ -50,19 +50,17 @@ WIN_UpdateDisplayMode(_THIS, HMONITOR hMonitor, LPCTSTR deviceName, DWORD index,
         char bmi_data[sizeof(BITMAPINFOHEADER) + 256 * sizeof(RGBQUAD)];
         LPBITMAPINFO bmi;
         HBITMAP hbm;
-        int logical_width = GetDeviceCaps( hdc, HORZRES );
-        int logical_height = GetDeviceCaps( hdc, VERTRES );
-        int hdpi, vdpi;
 
-        if (WIN_GetDisplayDPIInternal(_this, hMonitor, &hdpi, &vdpi) != 0) {
-            hdpi = 96;
-            vdpi = 96;
-        }
-
-        /* convert logical_width/logical_height from the Windows virtual screen
-           coordinate system to SDL points */
-        mode->w = MulDiv(logical_width, 96, hdpi);
-        mode->h = MulDiv(logical_height, 96, vdpi);
+        /* This is confusing.. If we are DPI-unaware:
+        - DeviceMode.dmPelsWidth are in pixels (unlike most other sizes, which are usually points).
+        - we can switch to a resolution in pixels which will temporarily disable DPI scaling
+          (see WIN_SetDisplayMode), as long as it's not equal the desktop resolution.
+        - for the desktop resolution, we have to live with DPI virtualization.
+          e.g. if the desktop is 2880x1800 at 192dpi, there's no way to switch to
+          2880x1800 at 96dpi aside from being DPI aware.
+        */
+        mode->w = GetDeviceCaps( hdc, HORZRES );
+        mode->h = GetDeviceCaps( hdc, VERTRES );
         
         SDL_zero(bmi_data);
         bmi = (LPBITMAPINFO) bmi_data;
