@@ -50,6 +50,19 @@ WIN_UpdateDisplayMode(_THIS, HMONITOR hMonitor, LPCTSTR deviceName, DWORD index,
         char bmi_data[sizeof(BITMAPINFOHEADER) + 256 * sizeof(RGBQUAD)];
         LPBITMAPINFO bmi;
         HBITMAP hbm;
+        int logical_width = GetDeviceCaps( hdc, HORZRES );
+        int logical_height = GetDeviceCaps( hdc, VERTRES );
+        int hdpi, vdpi;
+
+        if (WIN_GetDisplayDPIInternal(_this, hMonitor, &hdpi, &vdpi) != 0) {
+            hdpi = 96;
+            vdpi = 96;
+        }
+
+        /* convert logical_width/logical_height from the Windows virtual screen
+           coordinate system to SDL points */
+        mode->w = MulDiv(logical_width, 96, hdpi);
+        mode->h = MulDiv(logical_height, 96, vdpi);
         
         SDL_zero(bmi_data);
         bmi = (LPBITMAPINFO) bmi_data;
