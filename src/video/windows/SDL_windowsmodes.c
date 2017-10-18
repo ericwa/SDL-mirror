@@ -533,7 +533,7 @@ WIN_LogMonitor(_THIS, HMONITOR mon)
 
     name_utf8 = WIN_StringToUTF8(minfo.szDevice);
 
-    SDL_Log("monitor \"%s\" dpi: %d. (%d, %d), %dx%d pixels",
+    SDL_Log("WIN_LogMonitor: monitor \"%s\": dpi: %d. Windows virtual screen coordinates: (%d, %d), %dx%d",
         minfo.szDevice,
         xdpi,
         minfo.rcMonitor.left,
@@ -552,6 +552,7 @@ WIN_SetDisplayMode(_THIS, SDL_VideoDisplay * display, SDL_DisplayMode * mode)
     LONG status;
 
 #ifdef DEBUG_MODES
+    SDL_Log("WIN_SetDisplayMode: monitor before mode change:");
     WIN_LogMonitor(_this, displaydata->MonitorHandle);
 #endif
 
@@ -601,6 +602,7 @@ WIN_SetDisplayMode(_THIS, SDL_VideoDisplay * display, SDL_DisplayMode * mode)
     }
 
 #ifdef DEBUG_MODES
+    SDL_Log("WIN_SetDisplayMode: monitor after mode change:");
     WIN_LogMonitor(_this, displaydata->MonitorHandle);
 #endif
 
