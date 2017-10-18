@@ -534,7 +534,7 @@ WIN_LogMonitor(_THIS, HMONITOR mon)
     name_utf8 = WIN_StringToUTF8(minfo.szDevice);
 
     SDL_Log("WIN_LogMonitor: monitor \"%s\": dpi: %d. Windows virtual screen coordinates: (%d, %d), %dx%d",
-        minfo.szDevice,
+        name_utf8,
         xdpi,
         minfo.rcMonitor.left,
         minfo.rcMonitor.top,
