@@ -218,7 +218,7 @@ SDLTest_CommonArg(SDLTest_CommonState * state, int index)
         return 1;
     }
     if (SDL_strcasecmp(argv[index], "--allow-highdpi") == 0) {
-        SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_ENABLED, "1");
+        SDL_SetHint(SDL_HINT_VIDEO_ALLOW_HIGHDPI, "1");
         return 1;
     }
     if (SDL_strcasecmp(argv[index], "--windows") == 0) {

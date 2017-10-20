@@ -233,7 +233,7 @@ WIN_VideoInit(_THIS)
     /* Set the process DPI awareness */
     data->highdpi_enabled = SDL_FALSE;
 
-    if (SDL_GetHintBoolean(SDL_HINT_VIDEO_HIGHDPI_ENABLED, SDL_FALSE)) {
+    if (SDL_GetHintBoolean(SDL_HINT_VIDEO_ALLOW_HIGHDPI, SDL_FALSE)) {
         if (data->SetProcessDpiAwarenessContext) {
             /* Windows 10 Anniversary Update+ */
             BOOL result;

@@ -1392,7 +1392,7 @@ SDL_CreateWindow(const char *title, int x, int y, int w, int h, Uint32 flags)
     }
 
     /* This hint adds SDL_WINDOW_ALLOW_HIGHDPI to all windows. */
-    if (SDL_GetHintBoolean(SDL_HINT_VIDEO_HIGHDPI_ENABLED, SDL_FALSE)) {
+    if (SDL_GetHintBoolean(SDL_HINT_VIDEO_ALLOW_HIGHDPI, SDL_FALSE)) {
         flags |= SDL_WINDOW_ALLOW_HIGHDPI;
     }
 
