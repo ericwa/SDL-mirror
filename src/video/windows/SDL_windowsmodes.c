@@ -238,46 +238,6 @@ WIN_InitModes(_THIS)
     return 0;
 }
 
-/*
-Gets the DPI of a monitor.
-Always returns something in hdpi_out and vdpi_out; 96, 96 on failure.
-
-Returns 0 on success.
-*/
-static int
-WIN_GetDisplayDPIInternal(_THIS, HMONITOR hMonitor, int * hdpi_out, int * vdpi_out)
-{
-    const SDL_VideoData *videodata = (SDL_VideoData *)_this->driverdata;
-
-    *hdpi_out = 96;
-    *vdpi_out = 96;
-
-    if (videodata->GetDpiForMonitor) {
-        UINT hdpi_uint, vdpi_uint;
-        // Windows 8.1+ codepath
-        if (videodata->GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &hdpi_uint, &vdpi_uint) == S_OK) {
-            // GetDpiForMonitor docs promise to return the same hdpi/vdpi
-            *hdpi_out = hdpi_uint;
-            *vdpi_out = vdpi_uint;
-            return 0;
-        } else {
-            return SDL_SetError("GetDpiForMonitor failed");
-        }
-    } else {
-        // Window 8.0 and below: same DPI for all monitors.
-        HDC hdc;
-        hdc = GetDC(NULL);
-        if (hdc == NULL) {
-            return SDL_SetError("GetDC failed");
-        }
-        *hdpi_out = GetDeviceCaps(hdc, LOGPIXELSX);
-        *vdpi_out = GetDeviceCaps(hdc, LOGPIXELSY);
-        ReleaseDC(NULL, hdc);
-
-        return 0;
-    }
-}
-
 int
 WIN_GetDisplayDPI(_THIS, SDL_VideoDisplay * display, float * ddpi_out, float * hdpi_out, float * vdpi_out)
 {
