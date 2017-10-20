@@ -33,10 +33,8 @@
 
 /* #define DEBUG_MODES */
 
-static int WIN_GetDisplayDPIInternal(_THIS, HMONITOR hMonitor, int * hdpi_out, int * vdpi_out);
-
 static void
-WIN_UpdateDisplayMode(_THIS, HMONITOR hMonitor, LPCTSTR deviceName, DWORD index, SDL_DisplayMode * mode)
+WIN_UpdateDisplayMode(_THIS, LPCTSTR deviceName, DWORD index, SDL_DisplayMode * mode)
 {
     SDL_DisplayModeData *data = (SDL_DisplayModeData *) mode->driverdata;
     HDC hdc;
@@ -121,7 +119,7 @@ WIN_UpdateDisplayMode(_THIS, HMONITOR hMonitor, LPCTSTR deviceName, DWORD index,
 }
 
 static SDL_bool
-WIN_GetDisplayMode(_THIS, HMONITOR hMonitor, LPCTSTR deviceName, DWORD index, SDL_DisplayMode * mode)
+WIN_GetDisplayMode(_THIS, LPCTSTR deviceName, DWORD index, SDL_DisplayMode * mode)
 {
     SDL_DisplayModeData *data;
     DEVMODE devmode;
@@ -146,7 +144,7 @@ WIN_GetDisplayMode(_THIS, HMONITOR hMonitor, LPCTSTR deviceName, DWORD index, SD
     mode->refresh_rate = data->DeviceMode.dmDisplayFrequency;
 
     /* Fill in the mode information */
-    WIN_UpdateDisplayMode(_this, hMonitor, deviceName, index, mode);
+    WIN_UpdateDisplayMode(_this, deviceName, index, mode);
     return SDL_TRUE;
 }
 
@@ -162,7 +160,7 @@ WIN_AddDisplay(_THIS, HMONITOR hMonitor, const MONITORINFOEX *info)
     SDL_Log("Display: %s\n", WIN_StringToUTF8(info->szDevice));
 #endif
 
-    if (!WIN_GetDisplayMode(_this, hMonitor, info->szDevice, ENUM_CURRENT_SETTINGS, &mode)) {
+    if (!WIN_GetDisplayMode(_this, info->szDevice, ENUM_CURRENT_SETTINGS, &mode)) {
         return SDL_FALSE;
     }
 
@@ -500,7 +498,7 @@ WIN_GetDisplayModes(_THIS, SDL_VideoDisplay * display)
     SDL_DisplayMode mode;
 
     for (i = 0;; ++i) {
-        if (!WIN_GetDisplayMode(_this, data->MonitorHandle, data->DeviceName, i, &mode)) {
+        if (!WIN_GetDisplayMode(_this, data->DeviceName, i, &mode)) {
             break;
         }
         if (SDL_ISPIXELFORMAT_INDEXED(mode.format)) {
@@ -609,7 +607,7 @@ WIN_SetDisplayMode(_THIS, SDL_VideoDisplay * display, SDL_DisplayMode * mode)
 #endif
 
     EnumDisplaySettings(displaydata->DeviceName, ENUM_CURRENT_SETTINGS, &data->DeviceMode);
-    WIN_UpdateDisplayMode(_this, displaydata->MonitorHandle, displaydata->DeviceName, ENUM_CURRENT_SETTINGS, mode);
+    WIN_UpdateDisplayMode(_this, displaydata->DeviceName, ENUM_CURRENT_SETTINGS, mode);
     return 0;
 }
 
