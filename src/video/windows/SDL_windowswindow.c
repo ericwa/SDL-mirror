@@ -93,7 +93,7 @@ in: virtual screen coordinates (in pixels) of a window client rect
 out: virtual screen coordinates (in pixels) of a window rect (including frame)
 */
 static void
-WIN_AdjustWindowRectWithStyle_SpecifiedRect(SDL_Window *window, DWORD style, BOOL menu, int *x, int *y, int *width, int *height)
+WIN_AdjustWindowRectWithStyleAndRect(SDL_Window *window, DWORD style, BOOL menu, int *x, int *y, int *width, int *height)
 {
     const SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
     RECT rect;
@@ -147,7 +147,7 @@ WIN_AdjustWindowRectWithStyle(SDL_Window *window, DWORD style, BOOL menu, int *x
     h_pixels = height_points;
     WIN_ClientPointFromSDL(window, &w_pixels, &h_pixels);
 
-    WIN_AdjustWindowRectWithStyle_SpecifiedRect(window, style, menu, &x_pixels, &y_pixels, &w_pixels, &h_pixels);
+    WIN_AdjustWindowRectWithStyleAndRect(window, style, menu, &x_pixels, &y_pixels, &w_pixels, &h_pixels);
 
     *x = x_pixels;
     *y = y_pixels;
@@ -160,7 +160,7 @@ in: virtual screen coordinates (in pixels) of a window client rect
 out: virtual screen coordinates (in pixels) of a window rect (including frame)
 */
 void
-WIN_AdjustWindowRect_SpecifiedRect(SDL_Window *window, int *x, int *y, int *width, int *height)
+WIN_AdjustWindowRectWithRect(SDL_Window *window, int *x, int *y, int *width, int *height)
 {
     SDL_WindowData *data = (SDL_WindowData *)window->driverdata;
     HWND hwnd = data->hwnd;
@@ -169,7 +169,7 @@ WIN_AdjustWindowRect_SpecifiedRect(SDL_Window *window, int *x, int *y, int *widt
 
     style = GetWindowLong(hwnd, GWL_STYLE);
     menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(hwnd) != NULL);
-    WIN_AdjustWindowRectWithStyle_SpecifiedRect(window, style, menu, x, y, width, height);
+    WIN_AdjustWindowRectWithStyleAndRect(window, style, menu, x, y, width, height);
 }
 
 /*

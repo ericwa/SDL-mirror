@@ -752,7 +752,7 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             /* Expand w/h to include the frame. */
             unused_x = 0;
             unused_y = 0;
-            WIN_AdjustWindowRect_SpecifiedRect(data->window, &unused_x, &unused_y, &w, &h);
+            WIN_AdjustWindowRectWithRect(data->window, &unused_x, &unused_y, &w, &h);
 
             /* Fix our size to the current size */
             info = (MINMAXINFO *) lParam;
