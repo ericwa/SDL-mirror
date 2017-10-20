@@ -50,6 +50,8 @@ WIN_UpdateDisplayMode(_THIS, HMONITOR hMonitor, LPCTSTR deviceName, DWORD index,
         char bmi_data[sizeof(BITMAPINFOHEADER) + 256 * sizeof(RGBQUAD)];
         LPBITMAPINFO bmi;
         HBITMAP hbm;
+        int logical_width = GetDeviceCaps( hdc, HORZRES );
+        int logical_height = GetDeviceCaps( hdc, VERTRES );
 
         /* This is confusing.. If we are DPI-unaware:
         - DeviceMode.dmPelsWidth are in pixels (unlike most other sizes, which are usually points).
@@ -59,8 +61,8 @@ WIN_UpdateDisplayMode(_THIS, HMONITOR hMonitor, LPCTSTR deviceName, DWORD index,
           e.g. if the desktop is 2880x1800 at 192dpi, there's no way to switch to
           2880x1800 at 96dpi aside from being DPI aware.
         */
-        mode->w = GetDeviceCaps( hdc, HORZRES );
-        mode->h = GetDeviceCaps( hdc, VERTRES );
+        mode->w = logical_width;
+        mode->h = logical_height;
         
         SDL_zero(bmi_data);
         bmi = (LPBITMAPINFO) bmi_data;
