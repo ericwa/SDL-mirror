@@ -136,16 +136,16 @@ WIN_AdjustWindowRectWithStyle(SDL_Window *window, DWORD style, BOOL menu, int *x
     y_pixels = y_points;
     w_pixels = width_points;
     h_pixels = height_points;
-    WIN_ScreenRectToPixels(&x_pixels, &y_pixels, &w_pixels, &h_pixels);
+    WIN_ScreenRectFromSDL(&x_pixels, &y_pixels, &w_pixels, &h_pixels);
 
-    /* NOTE: we don't use the width/height returned by WIN_ScreenRectToPixels,
+    /* NOTE: we don't use the width/height returned by WIN_ScreenRectFromSDL,
        (which is making a guess of which monitor the rect is considered to be on)
-       but instead calculate width/height using WIN_ClientPointToPixels 
+       but instead calculate width/height using WIN_ClientPointFromSDL 
        which is using the DPI values that Windows considers the window to have.
      */
     w_pixels = width_points;
     h_pixels = height_points;
-    WIN_ClientPointToPixels(window, &w_pixels, &h_pixels);
+    WIN_ClientPointFromSDL(window, &w_pixels, &h_pixels);
 
     WIN_AdjustWindowRectWithStyle_SpecifiedRect(window, style, menu, &x_pixels, &y_pixels, &w_pixels, &h_pixels);
 
@@ -317,7 +317,7 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, HWND parent, SDL_bool cre
         if (GetClientRect(hwnd, &rect)) {
             int w = rect.right;
             int h = rect.bottom;
-            WIN_ClientPointFromPixels(window, &w, &h);
+            WIN_ClientPointToSDL(window, &w, &h);
             if ((window->w && window->w != w) || (window->h && window->h != h)) {
                 /* We tried to create a window larger than the desktop and Windows didn't allow it.  Override! */
                 int x, y;
@@ -342,7 +342,7 @@ SetupWindowData(_THIS, SDL_Window * window, HWND hwnd, HWND parent, SDL_bool cre
             int y = point.y;
             int w = rect.right;
             int h = rect.bottom;
-            WIN_ScreenRectFromPixels(&x, &y, &w, &h);
+            WIN_ScreenRectToSDL(&x, &y, &w, &h);
             window->x = x;
             window->y = y;
         }
@@ -1069,7 +1069,7 @@ WIN_GetDrawableSize(const SDL_Window *window, int *w, int *h)
 }
 
 void
-WIN_ClientPointFromPixels(const SDL_Window *window, int *x, int *y)
+WIN_ClientPointToSDL(const SDL_Window *window, int *x, int *y)
 {
     const SDL_WindowData *data = ((SDL_WindowData *)window->driverdata);
 
@@ -1078,7 +1078,7 @@ WIN_ClientPointFromPixels(const SDL_Window *window, int *x, int *y)
 }
 
 void
-WIN_ClientPointToPixels(const SDL_Window *window, int *x, int *y)
+WIN_ClientPointFromSDL(const SDL_Window *window, int *x, int *y)
 {
     const SDL_WindowData *data = ((SDL_WindowData *)window->driverdata);
 

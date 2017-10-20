@@ -502,7 +502,7 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 int x = GET_X_LPARAM(lParam);
                 int y = GET_Y_LPARAM(lParam);
 
-                WIN_ClientPointFromPixels(data->window, &x, &y);
+                WIN_ClientPointToSDL(data->window, &x, &y);
 
                 SDL_SendMouseMotion(data->window, mouseID, 0, x, y);
             }
@@ -733,9 +733,9 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
             /* Convert w, h, min_w, min_h, max_w, max_h to unscaled.
                We can treat them as a point in the client area. */
-            WIN_ClientPointToPixels(data->window, &w, &h);
-            WIN_ClientPointToPixels(data->window, &min_w, &min_h);
-            WIN_ClientPointToPixels(data->window, &max_w, &max_h);
+            WIN_ClientPointFromSDL(data->window, &w, &h);
+            WIN_ClientPointFromSDL(data->window, &min_w, &min_h);
+            WIN_ClientPointFromSDL(data->window, &max_w, &max_h);
 
             /* Store in min_w and min_h difference between current size and minimal
                size so we don't need to call AdjustWindowRectEx twice */
@@ -807,16 +807,16 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             y = rect.top;
             w = rect.right - rect.left;
             h = rect.bottom - rect.top;
-            WIN_ScreenRectFromPixels(&x, &y, &w, &h);
+            WIN_ScreenRectToSDL(&x, &y, &w, &h);
 
             SDL_SendWindowEvent(data->window, SDL_WINDOWEVENT_MOVED, x, y);
 
             /* NOTE: important to convert w/h from points -> pixels using 
-               WIN_ClientPointFromPixels, which uses the window's actual
-               DPI value, rather than WIN_ScreenRectFromPixels which guesses. */
+               WIN_ClientPointToSDL, which uses the window's actual
+               DPI value, rather than WIN_ScreenRectToSDL which guesses. */
             w = rect.right - rect.left;
             h = rect.bottom - rect.top;
-            WIN_ClientPointFromPixels(data->window, &w, &h);
+            WIN_ClientPointToSDL(data->window, &w, &h);
 
             SDL_SendWindowEvent(data->window, SDL_WINDOWEVENT_RESIZED, w,
                                 h);
@@ -1003,7 +1003,7 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 if (ScreenToClient(hwnd, &winpoint)) {
                     int x = (int) winpoint.x;
                     int y = (int) winpoint.y;
-                    WIN_ClientPointFromPixels(data->window, &x, &y);
+                    WIN_ClientPointToSDL(data->window, &x, &y);
                     const SDL_Point point = { x, y };
                     const SDL_HitTestResult rc = window->hit_test(window, &point, window->hit_test_data);
                     switch (rc) {

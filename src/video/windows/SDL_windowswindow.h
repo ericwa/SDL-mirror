@@ -85,8 +85,8 @@ extern void WIN_OnWindowEnter(_THIS, SDL_Window * window);
 extern void WIN_UpdateClipCursor(SDL_Window *window);
 extern int WIN_SetWindowHitTest(SDL_Window *window, SDL_bool enabled);
 extern void WIN_GetDrawableSize(const SDL_Window *window, int *w, int *h);
-extern void WIN_ClientPointFromPixels(const SDL_Window *window, int *w, int *h);
-extern void WIN_ClientPointToPixels(const SDL_Window *window, int *w, int *h);
+extern void WIN_ClientPointToSDL(const SDL_Window *window, int *w, int *h);
+extern void WIN_ClientPointFromSDL(const SDL_Window *window, int *w, int *h);
 
 #endif /* SDL_windowswindow_h_ */
 

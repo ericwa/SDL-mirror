@@ -362,7 +362,7 @@ WIN_GetDisplayBoundsInternal(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect,
     y = rect_pixels->top;
     w = rect_pixels->right - rect_pixels->left;
     h = rect_pixels->bottom - rect_pixels->top;
-    WIN_ScreenRectFromPixels(&x, &y, &w, &h);
+    WIN_ScreenRectToSDL(&x, &y, &w, &h);
 
     rect->x = x;
     rect->y = y;
@@ -455,7 +455,7 @@ WIN_DPIAtScreenPoint(int x, int y, int width_hint, int height_hint, UINT *dpi, R
 }
 
 /* Convert an SDL to a Windows screen coordinate. */
-void WIN_ScreenRectToPixels(int *x, int *y, int *w, int *h)
+void WIN_ScreenRectFromSDL(int *x, int *y, int *w, int *h)
 {
     RECT monitorrect_points, monitorrect_pixels;
     UINT dpi;
@@ -476,7 +476,7 @@ void WIN_ScreenRectToPixels(int *x, int *y, int *w, int *h)
 }
 
 /* Converts a Windows screen coordinate to an SDL one. */
-void WIN_ScreenRectFromPixels(int *x, int *y, int *w, int *h)
+void WIN_ScreenRectToSDL(int *x, int *y, int *w, int *h)
 {
     RECT monitorrect_points, monitorrect_pixels;
     UINT dpi;
