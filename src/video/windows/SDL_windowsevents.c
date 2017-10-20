@@ -798,8 +798,8 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             if (!GetClientRect(hwnd, &rect) || IsRectEmpty(&rect)) {
                 break;
             }
-            ClientToScreen(hwnd, (LPPOINT)& rect);
-            ClientToScreen(hwnd, (LPPOINT)& rect + 1);
+            ClientToScreen(hwnd, (LPPOINT) & rect);
+            ClientToScreen(hwnd, (LPPOINT) & rect + 1);
 
             WIN_UpdateClipCursor(data->window);
 
