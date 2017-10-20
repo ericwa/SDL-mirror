@@ -87,6 +87,9 @@
 #ifndef WM_DPICHANGED
 #define WM_DPICHANGED 0x02E0
 #endif
+#ifndef WM_GETDPISCALEDSIZE
+#define WM_GETDPISCALEDSIZE 0x02E4
+#endif
 
 static SDL_Scancode
 VKeytoScancode(WPARAM vkey)
@@ -1026,10 +1029,74 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         }
         break;
 
-    case WM_DPICHANGED:
+    case WM_GETDPISCALEDSIZE:
+        if (data->videodata->highdpi_enabled && data->videodata->GetDpiForWindow) {
+            /*
+            Windows default behaviour is to scale the window rect linearly
+            when dragging between monitors with different DPI's.
+            e.g. a 100x100 window dragged to a 200% scaled monitor
+            becomes 200x200.
 
-        if (data->videodata->highdpi_enabled)
-        {
+            For SDL, we want the client size to scale linearly.
+            This is not the same as the window rect scaling linearly,
+            because Windows doesn't scale the non-client area (titlebar etc.)
+            linearly. So, we need to handle this message to request custom
+            scaling.
+            */
+            
+            const int potentialDPI = (int)wParam;
+            const int currentDPI = (int)data->videodata->GetDpiForWindow(hwnd);
+            SIZE *sizeInOut = (SIZE *)lParam;
+
+            int x, y, w, h;
+            int frame_w, frame_h;
+            int query_client_w_win, query_client_h_win;
+            int unused_x, unused_y;
+
+            SDL_Log("WM_GETDPISCALEDSIZE: curr %d potential %d. in (%dx%d)", currentDPI, potentialDPI, sizeInOut->cx, sizeInOut->cy);
+
+            // this message is just a "hint" to Windows.
+
+            WIN_AdjustWindowRect(data->window, &x, &y, &w, &h, SDL_TRUE);
+
+            // get the frame size
+            frame_w = w - MulDiv(data->window->w, currentDPI, 96);
+            frame_h = h - MulDiv(data->window->h, currentDPI, 96);
+
+            query_client_w_win = sizeInOut->cx - frame_w;
+            query_client_h_win = sizeInOut->cy - frame_h;
+
+            // convert to new dpi
+            query_client_w_win = MulDiv(query_client_w_win, potentialDPI, currentDPI);
+            query_client_h_win = MulDiv(query_client_h_win, potentialDPI, currentDPI);
+
+            // re-add the frame in the new DPI
+            {
+                DWORD style;
+                BOOL menu;
+                RECT rect;
+
+                rect.left = 0;
+                rect.top = 0;
+                rect.right = query_client_w_win;
+                rect.bottom = query_client_h_win;
+
+                style = GetWindowLong(hwnd, GWL_STYLE);
+                menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(hwnd) != NULL);
+                data->videodata->AdjustWindowRectExForDpi(&rect, style, menu, 0, potentialDPI);
+
+                sizeInOut->cx = rect.right - rect.left;
+                sizeInOut->cy = rect.bottom - rect.top;
+            }
+
+            SDL_Log("WM_GETDPISCALEDSIZE: out (%dx%d)", sizeInOut->cx, sizeInOut->cy);
+
+            return TRUE;
+        }
+        break;
+
+    case WM_DPICHANGED:
+        if (data->videodata->highdpi_enabled) {
             const int newDPI = HIWORD(wParam);
             RECT* const suggestedRect = (RECT*)lParam;
             int x, y, w, h;
