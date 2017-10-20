@@ -414,7 +414,7 @@ WIN_DPIAtScreenPoint(int x, int y, int width_hint, int height_hint, UINT *dpi, R
     return 0;
 }
 
-/* Convert an SDL to a Windows screen coordinate. */
+/* Convert an SDL to a Windows screen rect. */
 void WIN_ScreenRectFromSDL(int *x, int *y, int *w, int *h)
 {
     RECT monitorrect_points, monitorrect_pixels;
@@ -435,7 +435,7 @@ void WIN_ScreenRectFromSDL(int *x, int *y, int *w, int *h)
     }
 }
 
-/* Converts a Windows screen coordinate to an SDL one. */
+/* Converts a Windows screen rect to an SDL one. */
 void WIN_ScreenRectToSDL(int *x, int *y, int *w, int *h)
 {
     RECT monitorrect_points, monitorrect_pixels;

@@ -89,8 +89,8 @@ GetWindowStyle(SDL_Window * window)
 }
 
 /*
-in: virtual screen coordinates (in pixels) of a window client rect
-out: virtual screen coordinates (in pixels) of a window rect (including frame)
+in: client rect (in Windows coordinates)
+out: window rect, including frame (in Windows coordinates)
 */
 static void
 WIN_AdjustWindowRectWithStyleAndRect(SDL_Window *window, DWORD style, BOOL menu, int *x, int *y, int *width, int *height)
@@ -119,7 +119,7 @@ WIN_AdjustWindowRectWithStyleAndRect(SDL_Window *window, DWORD style, BOOL menu,
 }
 
 /*
-out: virtual screen coordinates (in pixels) of a window rect (including frame)
+out: window rect, including frame (in Windows coordinates)
 */
 static void
 WIN_AdjustWindowRectWithStyle(SDL_Window *window, DWORD style, BOOL menu, int *x, int *y, int *width, int *height, SDL_bool use_current)
@@ -156,8 +156,8 @@ WIN_AdjustWindowRectWithStyle(SDL_Window *window, DWORD style, BOOL menu, int *x
 }
 
 /*
-in: virtual screen coordinates (in pixels) of a window client rect
-out: virtual screen coordinates (in pixels) of a window rect (including frame)
+in: client rect (in Windows coordinates)
+out: window rect, including frame (in Windows coordinates)
 */
 void
 WIN_AdjustWindowRectWithRect(SDL_Window *window, int *x, int *y, int *width, int *height)
@@ -173,7 +173,7 @@ WIN_AdjustWindowRectWithRect(SDL_Window *window, int *x, int *y, int *width, int
 }
 
 /*
-out: virtual screen coordinates (in pixels) of a window rect (including frame)
+out: window rect, including frame (in Windows coordinates)
 */
 void
 WIN_AdjustWindowRect(SDL_Window *window, int *x, int *y, int *width, int *height, SDL_bool use_current)
