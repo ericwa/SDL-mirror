@@ -350,24 +350,14 @@ tries to guess what DPI and which monitor Windows would assign a window located 
 returns 0 on success
 */
 static int
-WIN_DPIAtScreenPoint(int x, int y, int width_hint, int height_hint, UINT *dpi, RECT *monitorrect_points, RECT *monitorrect_pixels)
+WIN_DPIAtScreenPoint(const SDL_VideoData *videodata, int x, int y, int width_hint, int height_hint, UINT *dpi, RECT *monitorrect_points, RECT *monitorrect_pixels)
 {
     HMONITOR monitor = NULL;
     HRESULT result;
     MONITORINFO moninfo = { 0 };
-    const SDL_VideoData *videodata;
-    const SDL_VideoDevice *videodevice;
     RECT clientRect;
     UINT unused;
     int w, h;
-
-    videodevice = SDL_GetVideoDevice();
-    if (!videodevice || !videodevice->driverdata)
-        return SDL_SetError("no video device");
-
-    videodata = (SDL_VideoData *)videodevice->driverdata;
-    if (!videodata->highdpi_enabled)
-        return 1;
 
     /* General case: Windows 8.1+ */
 
@@ -417,10 +407,19 @@ WIN_DPIAtScreenPoint(int x, int y, int width_hint, int height_hint, UINT *dpi, R
 /* Convert an SDL to a Windows screen rect. */
 void WIN_ScreenRectFromSDL(int *x, int *y, int *w, int *h)
 {
+    const SDL_VideoDevice *videodevice = SDL_GetVideoDevice();
+    const SDL_VideoData *videodata;
     RECT monitorrect_points, monitorrect_pixels;
     UINT dpi;
 
-    if (WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorrect_points, &monitorrect_pixels) == 0) {
+    if (!videodevice || !videodevice->driverdata)
+        return;
+
+    videodata = (SDL_VideoData *)videodevice->driverdata;
+    if (!videodata->highdpi_enabled)
+        return;
+
+    if (WIN_DPIAtScreenPoint(videodata, *x, *y, *w, *h, &dpi, &monitorrect_points, &monitorrect_pixels) == 0) {
         *w = MulDiv(*w, dpi, 96);
         *h = MulDiv(*h, dpi, 96);
 
@@ -438,10 +437,19 @@ void WIN_ScreenRectFromSDL(int *x, int *y, int *w, int *h)
 /* Converts a Windows screen rect to an SDL one. */
 void WIN_ScreenRectToSDL(int *x, int *y, int *w, int *h)
 {
+    const SDL_VideoDevice *videodevice = SDL_GetVideoDevice();
+    const SDL_VideoData *videodata;
     RECT monitorrect_points, monitorrect_pixels;
     UINT dpi;
+
+    if (!videodevice || !videodevice->driverdata)
+        return;
+
+    videodata = (SDL_VideoData *)videodevice->driverdata;
+    if (!videodata->highdpi_enabled)
+        return;
     
-    if (WIN_DPIAtScreenPoint(*x, *y, *w, *h, &dpi, &monitorrect_points, &monitorrect_pixels) == 0) {
+    if (WIN_DPIAtScreenPoint(videodata, *x, *y, *w, *h, &dpi, &monitorrect_points, &monitorrect_pixels) == 0) {
         *w = MulDiv(*w, 96, dpi);
         *h = MulDiv(*h, 96, dpi);
 
