@@ -1030,14 +1030,17 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         break;
 
     case WM_GETDPISCALEDSIZE:
-        if (data->videodata->highdpi_enabled && data->videodata->GetDpiForWindow) {
+        if (data->videodata->highdpi_enabled 
+            && data->videodata->GetDpiForWindow
+            && data->videodata->AdjustWindowRectExForDpi) {
+
             /*
-            Windows default behaviour is to scale the window rect linearly
+            Windows expects applications to scale their window rects linearly
             when dragging between monitors with different DPI's.
             e.g. a 100x100 window dragged to a 200% scaled monitor
             becomes 200x200.
 
-            For SDL, we want the client size to scale linearly.
+            For SDL, we instead want the client size to scale linearly.
             This is not the same as the window rect scaling linearly,
             because Windows doesn't scale the non-client area (titlebar etc.)
             linearly. So, we need to handle this message to request custom
@@ -1053,9 +1056,9 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             int query_client_w_win, query_client_h_win;
             int unused_x, unused_y;
 
-            SDL_Log("WM_GETDPISCALEDSIZE: curr %d potential %d. in (%dx%d)", currentDPI, potentialDPI, sizeInOut->cx, sizeInOut->cy);
-
-            // this message is just a "hint" to Windows.
+#ifdef HIGHDPI_DEBUG
+            SDL_Log("WM_GETDPISCALEDSIZE: current DPI: %d potential DPI: %d. input size: (%dx%d)", currentDPI, potentialDPI, sizeInOut->cx, sizeInOut->cy);
+#endif
 
             WIN_AdjustWindowRect(data->window, &x, &y, &w, &h, SDL_TRUE);
 
@@ -1070,10 +1073,10 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             query_client_w_win = MulDiv(query_client_w_win, potentialDPI, currentDPI);
             query_client_h_win = MulDiv(query_client_h_win, potentialDPI, currentDPI);
 
-            // re-add the frame in the new DPI
+            // re-add the window frame in the new DPI
             {
-                DWORD style;
-                BOOL menu;
+                DWORD style = GetWindowLong(hwnd, GWL_STYLE);
+                BOOL menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(hwnd) != NULL);
                 RECT rect;
 
                 rect.left = 0;
@@ -1081,16 +1084,16 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 rect.right = query_client_w_win;
                 rect.bottom = query_client_h_win;
 
-                style = GetWindowLong(hwnd, GWL_STYLE);
-                menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(hwnd) != NULL);
-                data->videodata->AdjustWindowRectExForDpi(&rect, style, menu, 0, potentialDPI);
+                if (!(data->window->flags & SDL_WINDOW_BORDERLESS))
+                    data->videodata->AdjustWindowRectExForDpi(&rect, style, menu, 0, potentialDPI);
 
                 sizeInOut->cx = rect.right - rect.left;
                 sizeInOut->cy = rect.bottom - rect.top;
             }
 
-            SDL_Log("WM_GETDPISCALEDSIZE: out (%dx%d)", sizeInOut->cx, sizeInOut->cy);
-
+#ifdef HIGHDPI_DEBUG
+            SDL_Log("WM_GETDPISCALEDSIZE: output size: (%dx%d)", sizeInOut->cx, sizeInOut->cy);
+#endif
             return TRUE;
         }
         break;
