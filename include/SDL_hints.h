@@ -506,9 +506,19 @@ extern "C" {
  *  \brief If set to 1, then allow high-DPI on all windows.
  *
  * If high-DPI is allowed, the framebuffer size (which can be queried by calling SDL_GL_GetDrawableSize,
- * and returns a size in pixels) is decoupled from the SDL window size, which is in points. 
- * 
- * Moving a window between monitors can cause the framebuffer size to change.
+ * and returns a size in pixels) is decoupled from the SDL window size. SDL window sizes are in
+ * points, which are translated to pixels by multiplying by the scale factor of the monitor that
+ * the window is on.
+ *
+ * If high-DPI is not enabled with this hint, the framebuffer size will be equal to the window size
+ * returned by SDL_GetWindowSize, but the OS will scale up the framebuffer if the window is on a
+ * high-DPI monitor.
+ *
+ * An SDL_WINDOWEVENT_RESIZED event will be sent to the application when the framebuffer size changes,
+ * which could happen in response to the window moving to a monitor with a different scale factor
+ * (either from the user moving it, or SDL_SetWindowPosition), or the monitor's scale factor changing.
+ *
+ * High-DPI support is currently implemented on macOS and Windows.
  */
 #define SDL_HINT_VIDEO_ALLOW_HIGHDPI "SDL_VIDEO_ALLOW_HIGHDPI"
 
