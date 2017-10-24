@@ -225,43 +225,40 @@ VideoBootStrap WINDOWS_bootstrap = {
     "windows", "SDL Windows video driver", WIN_Available, WIN_CreateDevice
 };
 
+static void
+WIN_SetDPIAware(_THIS)
+{
+    SDL_VideoData *data = SDL_static_cast(SDL_VideoData *, _this->driverdata);
+    if (data->SetProcessDpiAwarenessContext) {
+        /* Windows 10 Anniversary Update+ */
+        /* First, try the Windows 10 Creators Update version */
+        BOOL result = data->SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        if (!result) {
+            result = data->SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+        }
+    } else if (data->SetProcessDpiAwareness) {
+        /* Windows 8.1-Windows 10 */
+        HRESULT result = data->SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+    } else if (data->SetProcessDPIAware) {
+        /* Vista-Windows 8.0 */
+        BOOL success = data->SetProcessDPIAware();
+    }
+
+    /* 
+    NOTE: The above calls will fail if the DPI awareness was already set outside of SDL.
+    In that case, we will just use whatever DPI awareness level was set externally.
+    */
+}
+
 int
 WIN_VideoInit(_THIS)
 {
     SDL_VideoData *data = SDL_static_cast(SDL_VideoData *, _this->driverdata);
 
     /* Set the process DPI awareness */
-    data->highdpi_enabled = SDL_FALSE;
-
-    if (SDL_GetHintBoolean(SDL_HINT_VIDEO_ALLOW_HIGHDPI, SDL_FALSE)) {
-        if (data->SetProcessDpiAwarenessContext) {
-            /* Windows 10 Anniversary Update+ */
-            BOOL result;
-
-            /* First, try the Windows 10 Creators Update version */
-            result = data->SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-            if (!result) {
-                result = data->SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
-            }
-
-            /* The above calls will fail if process DPI awareness was set externally to SDL.
-               In that case, don't enable SDL's highdpi support. */
-            if (result) {
-                data->highdpi_enabled = SDL_TRUE;
-            }
-        } else if (data->SetProcessDpiAwareness) {
-            /* Windows 8.1-Windows 10 */
-            HRESULT result = data->SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
-            if (result == S_OK) {
-                data->highdpi_enabled = SDL_TRUE;
-            }
-        } else if (data->SetProcessDPIAware) {
-            /* Vista-Windows 8.0 */
-            BOOL success = data->SetProcessDPIAware();
-            if (success) {                
-                data->highdpi_enabled = SDL_TRUE;
-            }
-        }
+    data->highdpi_enabled = SDL_GetHintBoolean(SDL_HINT_VIDEO_ALLOW_HIGHDPI, SDL_FALSE);
+    if (data->highdpi_enabled) {
+        WIN_SetDPIAware(_this);
     }
 
     if (WIN_InitModes(_this) < 0) {
