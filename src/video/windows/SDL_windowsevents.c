@@ -1054,7 +1054,6 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             int x, y, w, h;
             int frame_w, frame_h;
             int query_client_w_win, query_client_h_win;
-            int unused_x, unused_y;
 
 #ifdef HIGHDPI_DEBUG
             SDL_Log("WM_GETDPISCALEDSIZE: current DPI: %d potential DPI: %d. input size: (%dx%d)", currentDPI, potentialDPI, sizeInOut->cx, sizeInOut->cy);
