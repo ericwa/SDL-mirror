@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.lang.reflect.Method;
-import java.util.Objects;
 
 import android.app.*;
 import android.content.*;
@@ -25,6 +24,8 @@ import android.graphics.*;
 import android.graphics.drawable.Drawable;
 import android.hardware.*;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ApplicationInfo;
 
 /**
     SDL Activity
@@ -36,7 +37,7 @@ public class SDLActivity extends Activity {
 
     // Handle the state of the native layer
     public enum NativeState {
-           INIT, RESUMED, PAUSED 
+           INIT, RESUMED, PAUSED
     }
 
     public static NativeState mNextNativeState;
@@ -208,7 +209,7 @@ public class SDLActivity extends Activity {
         mLayout.addView(mSurface);
 
         setContentView(mLayout);
-        
+
         // Get filename from "Open with" of another application
         Intent intent = getIntent();
         if (intent != null && intent.getData() != null) {
@@ -265,7 +266,7 @@ public class SDLActivity extends Activity {
         } else {
            mNextNativeState = NativeState.PAUSED;
         }
-        
+
         SDLActivity.handleNativeState();
     }
 
@@ -355,7 +356,8 @@ public class SDLActivity extends Activity {
         // Try a transition to paused state
         if (mNextNativeState == NativeState.PAUSED) {
             nativePause();
-            mSurface.handlePause();
+            if (mSurface != null)
+                mSurface.handlePause();
             mCurrentNativeState = mNextNativeState;
             return;
         }
@@ -542,7 +544,7 @@ public class SDLActivity extends Activity {
     {
       int orientation = -1;
 
-      if (!Objects.equals(hint, "")) {
+      if (hint != "") {
          if (hint.contains("LandscapeRight") && hint.contains("LandscapeLeft")) {
             orientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE;
          } else if (hint.contains("LandscapeRight")) {
@@ -611,6 +613,29 @@ public class SDLActivity extends Activity {
      */
     public static Context getContext() {
         return SDL.getContext();
+    }
+
+    /**
+     * This method is called by SDL using JNI.
+     */
+    public static String getManifestEnvironmentVariable(String variableName) {
+        try {
+            ApplicationInfo applicationInfo = getContext().getPackageManager().getApplicationInfo(getContext().getPackageName(), PackageManager.GET_META_DATA);
+            if (applicationInfo.metaData == null) {
+                return null;
+            }
+
+            String key = "SDL_ENV." + variableName;
+            if (!applicationInfo.metaData.containsKey(key)) {
+                return null;
+            }
+
+            return applicationInfo.metaData.get(key).toString();
+        }
+        catch (PackageManager.NameNotFoundException e)
+        {
+            return null;
+        }
     }
 
     static class ShowTextInputTask implements Runnable {
@@ -1152,7 +1177,7 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
         SDLActivity.onNativeResize(width, height, sdlFormat, mDisplay.getRefreshRate());
         Log.v("SDL", "Window size: " + width + "x" + height);
 
- 
+
         boolean skip = false;
         int requestedOrientation = SDLActivity.mSingleton.getRequestedOrientation();
 
@@ -1175,7 +1200,7 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
         if (skip) {
            double min = Math.min(mWidth, mHeight);
            double max = Math.max(mWidth, mHeight);
-           
+
            if (max / min < 1.20) {
               Log.v("SDL", "Don't skip on such aspect-ratio. Could be a square resolution.");
               skip = false;
@@ -1187,7 +1212,7 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
            SDLActivity.mIsSurfaceReady = false;
            return;
         }
-        
+
         /* Surface is ready */
         SDLActivity.mIsSurfaceReady = true;
 
