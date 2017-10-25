@@ -350,23 +350,20 @@ tries to guess what DPI and which monitor Windows would assign a window located 
 returns 0 on success
 */
 static int
-WIN_DPIAtScreenPoint(const SDL_VideoData *videodata, int x, int y, int width_hint, int height_hint, UINT *dpi, RECT *monitorrect_points, RECT *monitorrect_pixels)
+WIN_DPIAtRect(const SDL_VideoData *videodata, int x, int y, int w, int h, UINT *dpi, RECT *monitorrect_sdl, RECT *monitorrect_win)
 {
     HMONITOR monitor = NULL;
     HRESULT result;
     MONITORINFO moninfo = { 0 };
-    RECT clientRect;
+    RECT rect;
     UINT unused;
-    int w, h;
+    int mon_width, mon_height;
 
-    /* General case: Windows 8.1+ */
-
-    clientRect.left = x;
-    clientRect.top = y;
-    clientRect.right = x + width_hint;
-    clientRect.bottom = y + height_hint;
-
-    monitor = MonitorFromRect(&clientRect, MONITOR_DEFAULTTONEAREST);
+    rect.left = x;
+    rect.top = y;
+    rect.right = x + w;
+    rect.bottom = y + h;
+    monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
 
     /* Check for Windows < 8.1*/
     if (!videodata->GetDpiForMonitor) {
@@ -389,17 +386,17 @@ WIN_DPIAtScreenPoint(const SDL_VideoData *videodata, int x, int y, int width_hin
         return SDL_SetError("GetMonitorInfo failed");
     }
 
-    *monitorrect_pixels = moninfo.rcMonitor;
-    *monitorrect_points = moninfo.rcMonitor;
+    *monitorrect_win = moninfo.rcMonitor;
+    *monitorrect_sdl = moninfo.rcMonitor;
 
     /* fix up the right/bottom of the "points" rect */
-    w = moninfo.rcMonitor.right - moninfo.rcMonitor.left;
-    h = moninfo.rcMonitor.bottom - moninfo.rcMonitor.top;
-    w = MulDiv(w, 96, *dpi);
-    h = MulDiv(h, 96, *dpi);
+    mon_width = moninfo.rcMonitor.right - moninfo.rcMonitor.left;
+    mon_height = moninfo.rcMonitor.bottom - moninfo.rcMonitor.top;
+    mon_width = MulDiv(mon_width, 96, *dpi);
+    mon_height = MulDiv(mon_height, 96, *dpi);
 
-    monitorrect_points->right = monitorrect_points->left + w;
-    monitorrect_points->bottom = monitorrect_points->top + h;
+    monitorrect_sdl->right = monitorrect_sdl->left + mon_width;
+    monitorrect_sdl->bottom = monitorrect_sdl->top + mon_height;
 
     return 0;
 }
@@ -409,7 +406,7 @@ void WIN_ScreenRectFromSDL(int *x, int *y, int *w, int *h)
 {
     const SDL_VideoDevice *videodevice = SDL_GetVideoDevice();
     const SDL_VideoData *videodata;
-    RECT monitorrect_points, monitorrect_pixels;
+    RECT monitorrect_sdl, monitorrect_win;
     UINT dpi;
 
     if (!videodevice || !videodevice->driverdata)
@@ -419,18 +416,18 @@ void WIN_ScreenRectFromSDL(int *x, int *y, int *w, int *h)
     if (!videodata->highdpi_enabled)
         return;
 
-    if (WIN_DPIAtScreenPoint(videodata, *x, *y, *w, *h, &dpi, &monitorrect_points, &monitorrect_pixels) == 0) {
+    if (WIN_DPIAtRect(videodata, *x, *y, *w, *h, &dpi, &monitorrect_sdl, &monitorrect_win) == 0) {
         *w = MulDiv(*w, dpi, 96);
         *h = MulDiv(*h, dpi, 96);
 
-        *x = monitorrect_points.left + MulDiv(*x - monitorrect_points.left, dpi, 96);
-        *y = monitorrect_points.top + MulDiv(*y - monitorrect_points.top, dpi, 96);
+        *x = monitorrect_sdl.left + MulDiv(*x - monitorrect_sdl.left, dpi, 96);
+        *y = monitorrect_sdl.top + MulDiv(*y - monitorrect_sdl.top, dpi, 96);
 
         /* ensure the result is not past the right/bottom of the monitor rect */
-        if (*x >= monitorrect_pixels.right)
-            *x = monitorrect_pixels.right - 1;
-        if (*y >= monitorrect_pixels.bottom)
-            *y = monitorrect_pixels.bottom - 1;
+        if (*x >= monitorrect_win.right)
+            *x = monitorrect_win.right - 1;
+        if (*y >= monitorrect_win.bottom)
+            *y = monitorrect_win.bottom - 1;
     }
 }
 
@@ -439,7 +436,7 @@ void WIN_ScreenRectToSDL(int *x, int *y, int *w, int *h)
 {
     const SDL_VideoDevice *videodevice = SDL_GetVideoDevice();
     const SDL_VideoData *videodata;
-    RECT monitorrect_points, monitorrect_pixels;
+    RECT monitorrect_sdl, monitorrect_win;
     UINT dpi;
 
     if (!videodevice || !videodevice->driverdata)
@@ -449,12 +446,12 @@ void WIN_ScreenRectToSDL(int *x, int *y, int *w, int *h)
     if (!videodata->highdpi_enabled)
         return;
     
-    if (WIN_DPIAtScreenPoint(videodata, *x, *y, *w, *h, &dpi, &monitorrect_points, &monitorrect_pixels) == 0) {
+    if (WIN_DPIAtRect(videodata, *x, *y, *w, *h, &dpi, &monitorrect_sdl, &monitorrect_win) == 0) {
         *w = MulDiv(*w, 96, dpi);
         *h = MulDiv(*h, 96, dpi);
 
-        *x = monitorrect_pixels.left + MulDiv(*x - monitorrect_pixels.left, 96, dpi);
-        *y = monitorrect_pixels.top + MulDiv(*y - monitorrect_pixels.top, 96, dpi);
+        *x = monitorrect_win.left + MulDiv(*x - monitorrect_win.left, 96, dpi);
+        *y = monitorrect_win.top + MulDiv(*y - monitorrect_win.top, 96, dpi);
     }
 }
 
@@ -535,7 +532,7 @@ WIN_SetDisplayMode(_THIS, SDL_VideoDisplay * display, SDL_DisplayMode * mode)
         reset the monitor DPI to 192. (200% scaling)
       NOTE: these are temporary changes in DPI, not modifications to the Control Panel setting.
 
-    - BUG: windows do not get a WM_DPICHANGED message after a ChangeDisplaySettingsEx, even though the
+    - Windows bug: windows do not get a WM_DPICHANGED message after a ChangeDisplaySettingsEx, even though the
       monitor DPI changes
       (as of Windows 10 Creator's Update, at least)
     */
