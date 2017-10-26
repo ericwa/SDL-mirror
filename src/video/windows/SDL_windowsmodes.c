@@ -341,7 +341,6 @@ WIN_GetMonitorDPIAndRects(const SDL_VideoData *videodata, HMONITOR monitor, UINT
 {
     HRESULT result;
     MONITORINFO moninfo = { 0 };
-    RECT rect;
     UINT unused;
     int mon_width, mon_height;
 
