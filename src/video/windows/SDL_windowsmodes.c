@@ -261,6 +261,7 @@ WIN_GetDisplayDPI(_THIS, SDL_VideoDisplay * display, float * ddpi_out, float * h
         int hpoints, vpoints, hpix, vpix;
         float hinches, vinches;
 
+        /* NOTE: all of this is just to compute the diagonal DPI. */
         hpoints = GetSystemMetrics(SM_CXVIRTUALSCREEN);
         vpoints = GetSystemMetrics(SM_CYVIRTUALSCREEN);
 

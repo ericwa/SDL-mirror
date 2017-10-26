@@ -249,19 +249,7 @@ WIN_SetDPIAware(_THIS)
         data->highdpi_enabled = SDL_TRUE;
     } else if (data->SetProcessDPIAware) {
         /* Vista-Windows 8.0 */
-        HDC hdc;
         BOOL success = data->SetProcessDPIAware();
-
-        /* Cache LOGPIXELSX/LOGPIXELSY. */
-        hdc = GetDC(NULL);
-        if (hdc) {
-            data->system_xdpi = GetDeviceCaps(hdc, LOGPIXELSX);
-            data->system_ydpi = GetDeviceCaps(hdc, LOGPIXELSY);
-            ReleaseDC(NULL, hdc);
-        } else {
-            data->system_xdpi = 96;
-            data->system_ydpi = 96;
-        }
 
         data->highdpi_enabled = SDL_TRUE;
     }
@@ -278,6 +266,19 @@ WIN_VideoInit(_THIS)
     /* Set the process DPI awareness */
     if (SDL_GetHintBoolean(SDL_HINT_VIDEO_ALLOW_HIGHDPI, SDL_FALSE)) {
         WIN_SetDPIAware(_this);
+    }
+
+    /* Cache LOGPIXELSX/LOGPIXELSY. */
+    {
+        HDC hdc = GetDC(NULL);
+        if (hdc) {
+            data->system_xdpi = GetDeviceCaps(hdc, LOGPIXELSX);
+            data->system_ydpi = GetDeviceCaps(hdc, LOGPIXELSY);
+            ReleaseDC(NULL, hdc);
+        } else {
+            data->system_xdpi = 96;
+            data->system_ydpi = 96;
+        }
     }
 
     if (WIN_InitModes(_this) < 0) {

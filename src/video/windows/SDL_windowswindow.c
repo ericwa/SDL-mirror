@@ -250,10 +250,8 @@ WIN_GetDPIForHWND(const SDL_VideoData *videodata, HWND hwnd, int *xdpi, int *ydp
     }
 
     /* Windows Vista-8.0 */
-    if (videodata->SetProcessDPIAware) {
-        *xdpi = videodata->system_xdpi;
-        *ydpi = videodata->system_ydpi;
-    }
+    *xdpi = videodata->system_xdpi;
+    *ydpi = videodata->system_ydpi;
 }
 
 static int
