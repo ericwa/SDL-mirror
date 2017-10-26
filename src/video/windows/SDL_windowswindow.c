@@ -416,9 +416,13 @@ WIN_CreateWindow(_THIS, SDL_Window * window)
 
     style |= GetWindowStyle(window);
 
-    /* For high-DPI support, it's easier / more robust to create the window
+    /* For high-DPI support, it's easier / more robust** to create the window
        with a width/height of 0, then in SetupWindowData we will check the
-       DPI and adjust the position and size to match window->x,y,w,h */
+       DPI and adjust the position and size to match window->x,y,w,h.
+       
+       **The reason is, we can't know window DPI for sure until after the
+       window is created.
+    */
     hwnd =
         CreateWindow(SDL_Appname, TEXT(""), style, CW_USEDEFAULT, 0, 0, 0, parent, NULL,
                      SDL_Instance, NULL);
@@ -717,8 +721,8 @@ WIN_SetWindowFullscreen(_THIS, SDL_Window * window, SDL_VideoDisplay * display, 
     style &= ~STYLE_MASK;
     style |= GetWindowStyle(window);
 
-    /* Prefer GetMonitorInfo over WIN_GetDisplayBounds because we want the
-       monitor bounds in pixels rather than SDL coordinates (points). */
+    /* Use GetMonitorInfo instead of WIN_GetDisplayBounds because we want the
+       monitor bounds in Windows coordinates (pixels) rather than SDL coordinates (points). */
     SDL_zero(minfo);
     minfo.cbSize = sizeof(MONITORINFO);
     if (!GetMonitorInfo(displaydata->MonitorHandle, &minfo)) {
