@@ -295,7 +295,7 @@ WIN_GetDisplayBoundsInternal(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect,
     const SDL_DisplayData *data = (const SDL_DisplayData *)display->driverdata;
     const SDL_VideoData *vid_data = (const SDL_VideoData *)_this->driverdata;
     MONITORINFO minfo;
-    const RECT *rect_pixels;
+    const RECT *rect_win;
     BOOL rc;
     int x, y;
     int w, h;
@@ -308,12 +308,12 @@ WIN_GetDisplayBoundsInternal(_THIS, SDL_VideoDisplay * display, SDL_Rect * rect,
         return SDL_SetError("Couldn't find monitor data");
     }
 
-    rect_pixels = usable ? &minfo.rcWork : &minfo.rcMonitor;
+    rect_win = usable ? &minfo.rcWork : &minfo.rcMonitor;
 
-    x = rect_pixels->left;
-    y = rect_pixels->top;
-    w = rect_pixels->right - rect_pixels->left;
-    h = rect_pixels->bottom - rect_pixels->top;
+    x = rect_win->left;
+    y = rect_win->top;
+    w = rect_win->right - rect_win->left;
+    h = rect_win->bottom - rect_win->top;
     WIN_ScreenRectToSDL(&x, &y, &w, &h);
 
     rect->x = x;
@@ -366,7 +366,7 @@ WIN_GetMonitorDPIAndRects(const SDL_VideoData *videodata, HMONITOR monitor, UINT
     *monitorrect_win = moninfo.rcMonitor;
     *monitorrect_sdl = moninfo.rcMonitor;
 
-    /* fix up the right/bottom of the "points" rect */
+    /* fix up the right/bottom of monitorrect_sdl */
     mon_width = moninfo.rcMonitor.right - moninfo.rcMonitor.left;
     mon_height = moninfo.rcMonitor.bottom - moninfo.rcMonitor.top;
     mon_width = MulDiv(mon_width, 96, *xdpi);
@@ -485,6 +485,7 @@ WIN_GetDisplayModes(_THIS, SDL_VideoDisplay * display)
     }
 }
 
+#ifdef DEBUG_MODES
 static void
 WIN_LogMonitor(_THIS, HMONITOR mon)
 {
@@ -512,6 +513,7 @@ WIN_LogMonitor(_THIS, HMONITOR mon)
 
     SDL_free(name_utf8);
 }
+#endif
 
 int
 WIN_SetDisplayMode(_THIS, SDL_VideoDisplay * display, SDL_DisplayMode * mode)
