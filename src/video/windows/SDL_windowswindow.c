@@ -124,35 +124,35 @@ out: window rect, including frame (in Windows coordinates)
 static void
 WIN_AdjustWindowRectWithStyle(SDL_Window *window, DWORD style, BOOL menu, int *x, int *y, int *width, int *height, SDL_bool use_current)
 {
-    int x_pixels, y_pixels;
-    int w_pixels, h_pixels;
+    int x_win, y_win;
+    int w_win, h_win;
 
-    const int x_points = (use_current ? window->x : window->windowed.x);
-    const int y_points = (use_current ? window->y : window->windowed.y);
-    const int width_points = (use_current ? window->w : window->windowed.w);
-    const int height_points = (use_current ? window->h : window->windowed.h);
+    const int x_sdl = (use_current ? window->x : window->windowed.x);
+    const int y_sdl = (use_current ? window->y : window->windowed.y);
+    const int w_sdl = (use_current ? window->w : window->windowed.w);
+    const int h_sdl = (use_current ? window->h : window->windowed.h);
 
-    x_pixels = x_points;
-    y_pixels = y_points;
-    w_pixels = width_points;
-    h_pixels = height_points;
-    WIN_ScreenRectFromSDL(&x_pixels, &y_pixels, &w_pixels, &h_pixels);
+    x_win = x_sdl;
+    y_win = y_sdl;
+    w_win = w_sdl;
+    h_win = h_sdl;
+    WIN_ScreenRectFromSDL(&x_win, &y_win, &w_win, &h_win);
 
     /* NOTE: we don't use the width/height returned by WIN_ScreenRectFromSDL,
        (which is making a guess of which monitor the rect is considered to be on)
        but instead calculate width/height using WIN_ClientPointFromSDL 
        which is using the DPI values that Windows considers the window to have.
      */
-    w_pixels = width_points;
-    h_pixels = height_points;
-    WIN_ClientPointFromSDL(window, &w_pixels, &h_pixels);
+    w_win = w_sdl;
+    h_win = h_sdl;
+    WIN_ClientPointFromSDL(window, &w_win, &h_win);
 
-    WIN_AdjustWindowRectWithStyleAndRect(window, style, menu, &x_pixels, &y_pixels, &w_pixels, &h_pixels);
+    WIN_AdjustWindowRectWithStyleAndRect(window, style, menu, &x_win, &y_win, &w_win, &h_win);
 
-    *x = x_pixels;
-    *y = y_pixels;
-    *width = w_pixels;
-    *height = h_pixels;
+    *x = x_win;
+    *y = y_win;
+    *width = w_win;
+    *height = h_win;
 }
 
 /*
