@@ -1115,20 +1115,26 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             data->scaling_xdpi = newDPI;
             data->scaling_ydpi = newDPI;
 
-            /* 
-            We're supposed to calls SetWindowPos with the values from suggestedRect, but by
-            default this preserves the apparent size of the window rect,
-            whereas we want to preserve the apparent size of the client rect.
+            if (data->videodata->AreDpiAwarenessContextsEqual
+                && data->videodata->GetThreadDpiAwarenessContext
+                && data->videodata->AreDpiAwarenessContextsEqual(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, data->videodata->GetThreadDpiAwarenessContext()))
+            {
+                /*
+                DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 means that
+                WM_GETDPISCALEDSIZE will have been called, so we can use suggestedRect.
+                */
+                w = suggestedRect->right - suggestedRect->left;
+                h = suggestedRect->bottom - suggestedRect->top;
+            } else {
+                /*
+                The OS does not support WM_GETDPISCALEDSIZE, so we can't use suggestedRect.
 
-            We'll use the left/top of suggestedRect as provided, but
-            calculate the width/height ourselves such that the apparent size
-            of the client rect remains the same.
-
-            On Creators Update and above, our handling of WM_GETDPISCALEDSIZE
-            should cause the suggestedRect to be the right size, so recomputing it here will 
-            have no effect.
-            */
-            WIN_AdjustWindowRect(data->window, &x, &y, &w, &h, SDL_TRUE);
+                (suggestedRect is calculated by default to preserves the apparent size of the window rect,
+                whereas we want to preserve the apparent size of the client rect.)
+                */
+                WIN_AdjustWindowRect(data->window, &x, &y, &w, &h, SDL_TRUE);
+            }
+            
 #ifdef HIGHDPI_DEBUG
             SDL_Log("WM_DPICHANGED: current SDL window size: (%dx%d)\tcalling SetWindowPos: (%d, %d), (%dx%d)\n",
                 data->window->w, data->window->h,
