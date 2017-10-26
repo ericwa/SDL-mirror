@@ -51,13 +51,14 @@ WIN_UpdateDisplayMode(_THIS, LPCTSTR deviceName, DWORD index, SDL_DisplayMode * 
         int logical_width = GetDeviceCaps( hdc, HORZRES );
         int logical_height = GetDeviceCaps( hdc, VERTRES );
 
-        /* This is confusing.. If we are DPI-unaware:
-        - DeviceMode.dmPelsWidth are in pixels (unlike most other sizes, which are usually points).
-        - we can switch to a resolution in pixels which will temporarily disable DPI scaling
-          (see WIN_SetDisplayMode), as long as it's not equal the desktop resolution.
-        - for the desktop resolution, we have to live with DPI virtualization.
-          e.g. if the desktop is 2880x1800 at 192dpi, there's no way to switch to
-          2880x1800 at 96dpi aside from being DPI aware.
+        /*
+        If DPI-unaware:
+        - GetDeviceCaps( hdc, HORZRES ) will return the monitor width in points.
+        - DeviceMode.dmPelsWidth is actual pixels (unlike almost all other Windows API's,
+          it's not virtualized when DPI unaware).
+
+        If DPI-aware:
+        - GetDeviceCaps( hdc, HORZRES ) will return pixels, same as DeviceMode.dmPelsWidth
         */
         mode->w = logical_width;
         mode->h = logical_height;
