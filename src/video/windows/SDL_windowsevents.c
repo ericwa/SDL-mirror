@@ -1106,7 +1106,9 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             int x, y, w, h;
 
 #ifdef HIGHDPI_DEBUG
-            SDL_Log("WM_DPICHANGED: new DPI: %d suggested rect: (%d, %d), (%dx%d)\n", newDPI, suggestedRect->left, suggestedRect->top, suggestedRect->right - suggestedRect->left, suggestedRect->bottom - suggestedRect->top);
+            SDL_Log("WM_DPICHANGED: %d to %d\tsuggested rect: (%d, %d), (%dx%d)\n", 
+                data->scaling_xdpi, newDPI,
+                suggestedRect->left, suggestedRect->top, suggestedRect->right - suggestedRect->left, suggestedRect->bottom - suggestedRect->top);
 #endif
 
             /* update the cached DPI value for this window */
@@ -1128,9 +1130,9 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             */
             WIN_AdjustWindowRect(data->window, &x, &y, &w, &h, SDL_TRUE);
 #ifdef HIGHDPI_DEBUG
-            SDL_Log("WM_DPICHANGED: current SDL window size is (%dx%d) points, want (%dx%d) pixels client size at new DPI (%d)\n",
-                data->window->w, data->window->h, w, h, newDPI);
-            SDL_Log("WM_DPICHANGED: calling SetWindowPos: (%d, %d), (%dx%d)\n", suggestedRect->left, suggestedRect->top, w, h);
+            SDL_Log("WM_DPICHANGED: current SDL window size: (%dx%d)\tcalling SetWindowPos: (%d, %d), (%dx%d)\n",
+                data->window->w, data->window->h,
+                suggestedRect->left, suggestedRect->top, w, h);
 #endif
 
             /* clear the window size, to cause us to send a SDL_WINDOWEVENT_RESIZED event in WM_WINDOWPOSCHANGED */
