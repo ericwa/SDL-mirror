@@ -1062,18 +1062,18 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
             WIN_AdjustWindowRect(data->window, &x, &y, &w, &h, SDL_TRUE);
 
-            // get the frame size
+            /* get the frame size */
             frame_w = w - MulDiv(data->window->w, currentDPI, 96);
             frame_h = h - MulDiv(data->window->h, currentDPI, 96);
 
             query_client_w_win = sizeInOut->cx - frame_w;
             query_client_h_win = sizeInOut->cy - frame_h;
 
-            // convert to new dpi
+            /* convert to new dpi */
             query_client_w_win = MulDiv(query_client_w_win, potentialDPI, currentDPI);
             query_client_h_win = MulDiv(query_client_h_win, potentialDPI, currentDPI);
 
-            // re-add the window frame in the new DPI
+            /* re-add the window frame in the new DPI */
             {
                 DWORD style = GetWindowLong(hwnd, GWL_STYLE);
                 BOOL menu = (style & WS_CHILDWINDOW) ? FALSE : (GetMenu(hwnd) != NULL);
