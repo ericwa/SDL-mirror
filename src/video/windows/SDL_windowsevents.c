@@ -814,7 +814,7 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
             SDL_SendWindowEvent(data->window, SDL_WINDOWEVENT_MOVED, x, y);
 
-            /* NOTE: important to convert w/h from points -> pixels using 
+            /* NOTE: important to convert w/h from SDL (points) to Windows (pixels) using 
                WIN_ClientPointToSDL, which uses the window's actual
                DPI value, rather than WIN_ScreenRectToSDL which guesses. */
             w = rect.right - rect.left;
@@ -825,8 +825,9 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                                 h);
 
 #ifdef HIGHDPI_DEBUG
-            SDL_Log("WM_WINDOWPOSCHANGED: client rect, pixels: (%d, %d) (%d x %d) client rect, points: (%d, %d) (%d x %d)\n", 
-                rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
+            SDL_Log("WM_WINDOWPOSCHANGED: Windows client rect (pixels): (%d, %d) (%d x %d)",
+                rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+            SDL_Log("WM_WINDOWPOSCHANGED: SDL client rect (points):     (%d, %d) (%d x %d)",
                 x, y, w, h);
 #endif
 
