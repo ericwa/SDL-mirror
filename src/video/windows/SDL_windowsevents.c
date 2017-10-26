@@ -825,9 +825,8 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                                 h);
 
 #ifdef HIGHDPI_DEBUG
-            SDL_Log("WM_WINDOWPOSCHANGED: Windows client rect (pixels): (%d, %d) (%d x %d)",
-                rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
-            SDL_Log("WM_WINDOWPOSCHANGED: SDL client rect (points):     (%d, %d) (%d x %d)",
+            SDL_Log("WM_WINDOWPOSCHANGED: Windows client rect (pixels): (%d, %d) (%d x %d)\tSDL client rect (points): (%d, %d) (%d x %d)",
+                rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
                 x, y, w, h);
 #endif
 
@@ -1030,7 +1029,8 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         }
         break;
 
-    case WM_GETDPISCALEDSIZE:
+    case WM_GETDPISCALEDSIZE: /* Windows 10 Creators Update+ */
+        /* GetDpiForWindow and AdjustWindowRectExForDpi will be present, but check anyway. */
         if (data->videodata->highdpi_enabled 
             && data->videodata->GetDpiForWindow
             && data->videodata->AdjustWindowRectExForDpi) {
@@ -1087,6 +1087,7 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 if (!(data->window->flags & SDL_WINDOW_BORDERLESS))
                     data->videodata->AdjustWindowRectExForDpi(&rect, style, menu, 0, potentialDPI);
 
+                /* This is supposed to control the suggested rect param of WM_DPICHANGED */
                 sizeInOut->cx = rect.right - rect.left;
                 sizeInOut->cy = rect.bottom - rect.top;
             }
@@ -1098,7 +1099,7 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         }
         break;
 
-    case WM_DPICHANGED:
+    case WM_DPICHANGED: /* Windows 8.1+ */
         if (data->videodata->highdpi_enabled) {
             const int newDPI = HIWORD(wParam);
             RECT* const suggestedRect = (RECT*)lParam;
@@ -1112,13 +1113,18 @@ WIN_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             data->scaling_xdpi = newDPI;
             data->scaling_ydpi = newDPI;
 
-            /* Example code for hanling WM_DPICHANGED usually just calls SetWindowPos with the 
-               values from suggestedRect, but this preserves the apparent size of the window rect,
-               whereas we want to preserve the apparent size of the client rect.
+            /* 
+            We're supposed to calls SetWindowPos with the values from suggestedRect, but by
+            default this preserves the apparent size of the window rect,
+            whereas we want to preserve the apparent size of the client rect.
 
-               Instead, we'll use the left/top of suggestedRect as provided, but
-               calculate the width/height ourselves such that the apparent size
-               of the client rect remains the same. 
+            We'll use the left/top of suggestedRect as provided, but
+            calculate the width/height ourselves such that the apparent size
+            of the client rect remains the same.
+
+            On Creators Update and above, our handling of WM_GETDPISCALEDSIZE
+            should cause the suggestedRect to be the right size, so recomputing it here will 
+            have no effect.
             */
             WIN_AdjustWindowRect(data->window, &x, &y, &w, &h, SDL_TRUE);
 #ifdef HIGHDPI_DEBUG
