@@ -205,7 +205,7 @@ WIN_SetWindowPositionInternal(_THIS, SDL_Window * window, UINT flags)
     }
 
 #ifdef HIGHDPI_DEBUG
-    SDL_Log("WIN_SetWindowPositionInternal: (%d, %d) (%d x %d)", window->x, window->y, window->w, window->h);
+    SDL_Log("WIN_SetWindowPositionInternal: SDL window rect: (%d, %d) (%d x %d)", window->x, window->y, window->w, window->h);
 #endif
 
     WIN_AdjustWindowRect(window, &x, &y, &w, &h, SDL_TRUE);    
