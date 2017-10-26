@@ -258,7 +258,20 @@ WIN_VideoInit(_THIS)
     /* Set the process DPI awareness */
     data->highdpi_enabled = SDL_GetHintBoolean(SDL_HINT_VIDEO_ALLOW_HIGHDPI, SDL_FALSE);
     if (data->highdpi_enabled) {
+        HDC hdc;
+
         WIN_SetDPIAware(_this);
+
+        /* Cache LOGPIXELSX/LOGPIXELSY. These are only used pre-Windows 8.1 */
+        hdc = GetDC(NULL);
+        if (hdc) {
+            data->system_xdpi = GetDeviceCaps(hdc, LOGPIXELSX);
+            data->system_ydpi = GetDeviceCaps(hdc, LOGPIXELSY);
+            ReleaseDC(NULL, hdc);
+        } else {
+            data->system_xdpi = 96;
+            data->system_ydpi = 96;
+        }
     }
 
     if (WIN_InitModes(_this) < 0) {

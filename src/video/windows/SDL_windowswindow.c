@@ -250,14 +250,8 @@ WIN_GetDPIForHWND(const SDL_VideoData *videodata, HWND hwnd, int *xdpi, int *ydp
     }
 
     /* windows 8.0 and below */
-    {
-        HDC hdc = GetDC(NULL);
-        if (hdc) {
-            *xdpi = GetDeviceCaps(hdc, LOGPIXELSX);
-            *ydpi = GetDeviceCaps(hdc, LOGPIXELSY);
-            ReleaseDC(NULL, hdc);
-        }
-    }
+    *xdpi = videodata->system_xdpi;
+    *ydpi = videodata->system_ydpi;
 }
 
 static int

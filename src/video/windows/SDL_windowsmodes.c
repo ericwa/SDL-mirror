@@ -258,29 +258,20 @@ WIN_GetDisplayDPI(_THIS, SDL_VideoDisplay * display, float * ddpi_out, float * h
         }
     } else {
         // Window 8.0 and below: same DPI for all monitors.
-        HDC hdc;
-        int hdpi_int, vdpi_int, hpoints, vpoints, hpix, vpix;
+        int hpoints, vpoints, hpix, vpix;
         float hinches, vinches;
-
-        hdc = GetDC(NULL);
-        if (hdc == NULL) {
-            return SDL_SetError("GetDC failed");
-        }
-        hdpi_int = GetDeviceCaps(hdc, LOGPIXELSX);
-        vdpi_int = GetDeviceCaps(hdc, LOGPIXELSY);
-        ReleaseDC(NULL, hdc);
 
         hpoints = GetSystemMetrics(SM_CXVIRTUALSCREEN);
         vpoints = GetSystemMetrics(SM_CYVIRTUALSCREEN);
 
-        hpix = MulDiv(hpoints, hdpi_int, 96);
-        vpix = MulDiv(vpoints, vdpi_int, 96);
+        hpix = MulDiv(hpoints, videodata->system_xdpi, 96);
+        vpix = MulDiv(vpoints, videodata->system_ydpi, 96);
 
         hinches = (float)hpoints / 96.0f;
         vinches = (float)vpoints / 96.0f;
 
-        hdpi = (float)hdpi_int;
-        vdpi = (float)vdpi_int;
+        hdpi = (float)videodata->system_xdpi;
+        vdpi = (float)videodata->system_ydpi;
         ddpi = SDL_ComputeDiagonalDPI(hpix, vpix, hinches, vinches);
     }
 
@@ -367,11 +358,8 @@ WIN_DPIAtRect(const SDL_VideoData *videodata, int x, int y, int w, int h, UINT *
 
     /* Check for Windows < 8.1*/
     if (!videodata->GetDpiForMonitor) {
-        HDC hdc = GetDC(NULL);
-        if (hdc) {
-            *dpi = GetDeviceCaps(hdc, LOGPIXELSX);
-            ReleaseDC(NULL, hdc);
-        }
+        // FIXME: return xdpi/ydpi
+        *dpi = videodata->system_xdpi;
     } else {
         result = videodata->GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, dpi, &unused);
         if (result != S_OK) {
