@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2017 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2018 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -29,7 +29,6 @@
 
 #include "SDL_system.h"
 #include "SDL_android.h"
-#include <EGL/egl.h>
 
 #include "keyinfotable.h"
 
@@ -128,6 +127,13 @@ JNIEXPORT jstring JNICALL SDL_JAVA_INTERFACE(nativeGetHint)(
         JNIEnv* env, jclass cls,
         jstring name);
 
+JNIEXPORT void JNICALL SDL_JAVA_INTERFACE(nativeSetenv)(
+        JNIEnv* env, jclass cls,
+        jstring name, jstring value);
+
+JNIEXPORT void JNICALL SDL_JAVA_INTERFACE(nativeEnvironmentVariablesSet)(
+        JNIEnv* env, jclass cls);
+
 /* Java class SDLInputConnection */
 JNIEXPORT void JNICALL SDL_JAVA_INTERFACE_INPUT_CONNECTION(nativeCommitText)(
         JNIEnv* env, jclass cls,
@@ -203,8 +209,10 @@ static jclass mActivityClass;
 /* method signatures */
 static jmethodID midGetNativeSurface;
 static jmethodID midSetActivityTitle;
+static jmethodID midSetWindowStyle;
 static jmethodID midSetOrientation;
 static jmethodID midGetContext;
+static jmethodID midIsAndroidTV;
 static jmethodID midInputGetInputDeviceIds;
 static jmethodID midSendMessage;
 static jmethodID midShowTextInput;
@@ -213,7 +221,8 @@ static jmethodID midClipboardSetText;
 static jmethodID midClipboardGetText;
 static jmethodID midClipboardHasText;
 static jmethodID midOpenAPKExpansionInputStream;
-static jmethodID midGetManifestEnvironmentVariable;
+static jmethodID midGetManifestEnvironmentVariables;
+static jmethodID midGetDisplayDPI;
 
 /* audio manager */
 static jclass mAudioManagerClass;
@@ -242,6 +251,8 @@ static jfieldID fidSeparateMouseAndTouch;
 /* Accelerometer data storage */
 static float fLastAccelerometer[3];
 static SDL_bool bHasNewData;
+
+static SDL_bool bHasEnvironmentVariables = SDL_FALSE;
 
 /*******************************************************************************
                  Functions called by JNI
@@ -292,10 +303,14 @@ JNIEXPORT void JNICALL SDL_JAVA_INTERFACE(nativeSetupJNI)(JNIEnv* mEnv, jclass c
                                 "getNativeSurface","()Landroid/view/Surface;");
     midSetActivityTitle = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,
                                 "setActivityTitle","(Ljava/lang/String;)Z");
+    midSetWindowStyle = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,
+                                "setWindowStyle","(Z)V");
     midSetOrientation = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,
                                 "setOrientation","(IIZLjava/lang/String;)V");
     midGetContext = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,
                                 "getContext","()Landroid/content/Context;");
+    midIsAndroidTV = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,
+                                "isAndroidTV","()Z");
     midInputGetInputDeviceIds = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,
                                 "inputGetInputDeviceIds", "(I)[I");
     midSendMessage = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,
@@ -313,14 +328,17 @@ JNIEXPORT void JNICALL SDL_JAVA_INTERFACE(nativeSetupJNI)(JNIEnv* mEnv, jclass c
     midOpenAPKExpansionInputStream = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,
                                 "openAPKExpansionInputStream", "(Ljava/lang/String;)Ljava/io/InputStream;");
 
-    midGetManifestEnvironmentVariable = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,
-                                "getManifestEnvironmentVariable", "(Ljava/lang/String;)Ljava/lang/String;");
+    midGetManifestEnvironmentVariables = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass,
+                                "getManifestEnvironmentVariables", "()Z");
+
+    midGetDisplayDPI = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass, "getDisplayDPI", "()Landroid/util/DisplayMetrics;");
+    midGetDisplayDPI = (*mEnv)->GetStaticMethodID(mEnv, mActivityClass, "getDisplayDPI", "()Landroid/util/DisplayMetrics;");
 
     if (!midGetNativeSurface ||
-       !midSetActivityTitle || !midSetOrientation || !midGetContext || !midInputGetInputDeviceIds ||
-       !midSendMessage || !midShowTextInput || !midIsScreenKeyboardShown || 
+       !midSetActivityTitle || !midSetWindowStyle || !midSetOrientation || !midGetContext || !midIsAndroidTV || !midInputGetInputDeviceIds ||
+       !midSendMessage || !midShowTextInput || !midIsScreenKeyboardShown ||
        !midClipboardSetText || !midClipboardGetText || !midClipboardHasText ||
-       !midOpenAPKExpansionInputStream || !midGetManifestEnvironmentVariable) {
+       !midOpenAPKExpansionInputStream || !midGetManifestEnvironmentVariables|| !midGetDisplayDPI) {
         __android_log_print(ANDROID_LOG_WARN, "SDL", "Missing some Java callbacks, do you have the latest version of SDLActivity.java?");
     }
 
@@ -805,6 +823,20 @@ JNIEXPORT jstring JNICALL SDL_JAVA_INTERFACE(nativeGetHint)(
     return result;
 }
 
+JNIEXPORT void JNICALL SDL_JAVA_INTERFACE(nativeSetenv)(
+                                    JNIEnv* env, jclass cls,
+                                    jstring name, jstring value)
+{
+    const char *utfname = (*env)->GetStringUTFChars(env, name, NULL);
+    const char *utfvalue = (*env)->GetStringUTFChars(env, value, NULL);
+
+    SDL_setenv(utfname, utfvalue, 1);
+
+    (*env)->ReleaseStringUTFChars(env, name, utfname);
+    (*env)->ReleaseStringUTFChars(env, value, utfvalue);
+
+}
+
 /*******************************************************************************
              Functions called by SDL into Java
 *******************************************************************************/
@@ -876,6 +908,12 @@ void Android_JNI_SetActivityTitle(const char *title)
     jstring jtitle = (jstring)((*mEnv)->NewStringUTF(mEnv, title));
     (*mEnv)->CallStaticBooleanMethod(mEnv, mActivityClass, midSetActivityTitle, jtitle);
     (*mEnv)->DeleteLocalRef(mEnv, jtitle);
+}
+
+void Android_JNI_SetWindowStyle(SDL_bool fullscreen)
+{
+    JNIEnv *mEnv = Android_JNI_GetEnv();
+    (*mEnv)->CallStaticVoidMethod(mEnv, mActivityClass, midSetWindowStyle, fullscreen ? 1 : 0);
 }
 
 void Android_JNI_SetOrientation(int w, int h, int resizable, const char *hint)
@@ -1045,6 +1083,38 @@ int Android_JNI_OpenAudioDevice(int iscapture, int sampleRate, int is16Bit, int 
     }
 
     return audioBufferFrames;
+}
+
+int Android_JNI_GetDisplayDPI(float *ddpi, float *xdpi, float *ydpi)
+{
+    JNIEnv *env = Android_JNI_GetEnv();
+
+    jobject jDisplayObj = (*env)->CallStaticObjectMethod(env, mActivityClass, midGetDisplayDPI);
+    jclass jDisplayClass = (*env)->GetObjectClass(env, jDisplayObj);
+
+    jfieldID fidXdpi = (*env)->GetFieldID(env, jDisplayClass, "xdpi", "F");
+    jfieldID fidYdpi = (*env)->GetFieldID(env, jDisplayClass, "ydpi", "F");
+    jfieldID fidDdpi = (*env)->GetFieldID(env, jDisplayClass, "densityDpi", "I");
+
+    float nativeXdpi = (*env)->GetFloatField(env, jDisplayObj, fidXdpi);
+    float nativeYdpi = (*env)->GetFloatField(env, jDisplayObj, fidYdpi);
+    int nativeDdpi = (*env)->GetIntField(env, jDisplayObj, fidDdpi);
+
+
+    (*env)->DeleteLocalRef(env, jDisplayObj);
+    (*env)->DeleteLocalRef(env, jDisplayClass);
+
+    if (ddpi) {
+        *ddpi = (float)nativeDdpi;
+    }
+    if (xdpi) {
+        *xdpi = nativeXdpi;
+    }
+    if (ydpi) {
+        *ydpi = nativeYdpi;
+    }
+
+    return 0;
 }
 
 void * Android_JNI_GetAudioBuffer(void)
@@ -1936,6 +2006,12 @@ void *SDL_AndroidGetActivity(void)
     return (*env)->CallStaticObjectMethod(env, mActivityClass, midGetContext);
 }
 
+SDL_bool SDL_IsAndroidTV(void)
+{
+    JNIEnv *env = Android_JNI_GetEnv();
+    return (*env)->CallStaticBooleanMethod(env, mActivityClass, midIsAndroidTV);
+}
+
 const char * SDL_AndroidGetInternalStoragePath(void)
 {
     static char *s_AndroidInternalFilesPath = NULL;
@@ -1972,10 +2048,14 @@ const char * SDL_AndroidGetInternalStoragePath(void)
             return NULL;
         }
 
-        /* path = fileObject.getAbsolutePath(); */
+        /* path = fileObject.getCanonicalPath(); */
         mid = (*env)->GetMethodID(env, (*env)->GetObjectClass(env, fileObject),
-                "getAbsolutePath", "()Ljava/lang/String;");
+                "getCanonicalPath", "()Ljava/lang/String;");
         pathString = (jstring)(*env)->CallObjectMethod(env, fileObject, mid);
+        if (Android_JNI_ExceptionOccurred(SDL_FALSE)) {
+            LocalReferenceHolder_Cleanup(&refs);
+            return NULL;
+        }
 
         path = (*env)->GetStringUTFChars(env, pathString, NULL);
         s_AndroidInternalFilesPath = SDL_strdup(path);
@@ -2070,39 +2150,20 @@ const char * SDL_AndroidGetExternalStoragePath(void)
     return s_AndroidExternalFilesPath;
 }
 
-// Ugh, but we have to SDL_strdup() our result to pass it safely back
-// out into normal SDL_getenv flow.  So we'll just do the same sort
-// of trick as on Win32 over in SDL_getenv.c.
-char *SDL_AndroidEnvMem;
-
-char *SDL_AndroidGetManifestEnvironmentVariable(const char *variableName)
+void Android_JNI_GetManifestEnvironmentVariables(void)
 {
-    if ((mActivityClass == NULL) || (midGetManifestEnvironmentVariable == 0)) {
-        __android_log_print(ANDROID_LOG_WARN, "SDL", "request to get environment variable before JNI is ready: %s", variableName);
-        return NULL;
+    if (!mActivityClass || !midGetManifestEnvironmentVariables) {
+        __android_log_print(ANDROID_LOG_WARN, "SDL", "Request to get environment variables before JNI is ready");
+        return;
     }
 
-    JNIEnv *env = Android_JNI_GetEnv();
-
-    jstring jVariableName = (*env)->NewStringUTF(env, variableName);
-    jstring jResult = (jstring)((*env)->CallStaticObjectMethod(env, mActivityClass, midGetManifestEnvironmentVariable, jVariableName));
-
-    if (jResult == NULL) {
-        return NULL;        
+    if (!bHasEnvironmentVariables) {
+        JNIEnv *env = Android_JNI_GetEnv();
+        SDL_bool ret = (*env)->CallStaticBooleanMethod(env, mActivityClass, midGetManifestEnvironmentVariables);
+        if (ret) {
+            bHasEnvironmentVariables = SDL_TRUE;
+        }
     }
-
-    if (SDL_AndroidEnvMem) {
-        SDL_free(SDL_AndroidEnvMem);
-        SDL_AndroidEnvMem = NULL;
-    }
-
-    const char *result = (*env)->GetStringUTFChars(env, jResult, NULL);
-    SDL_AndroidEnvMem = SDL_strdup(result);
-    (*env)->ReleaseStringUTFChars(env, jResult, result);
-    (*env)->DeleteLocalRef(env, jResult);
-
-    __android_log_print(ANDROID_LOG_INFO, "SDL", "environment variable in metadata: %s = %s", variableName, SDL_AndroidEnvMem);
-    return SDL_AndroidEnvMem;
 }
 
 #endif /* __ANDROID__ */

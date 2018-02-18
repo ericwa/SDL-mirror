@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2017 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2018 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -171,23 +171,17 @@ SDL_setenv(const char *name, const char *value, int overwrite)
 #endif
 
 /* Retrieve a variable named "name" from the environment */
+#if defined(HAVE_GETENV)
+char *
+SDL_getenv(const char *name)
+{
 #if defined(__ANDROID__)
-char *
-SDL_getenv(const char *name)
-{
-    /* Input validation */
-    if (!name || SDL_strlen(name)==0) {
-        return NULL;
-    }
+    /* Make sure variables from the application manifest are available */
+    Android_JNI_GetManifestEnvironmentVariables();
+#endif
 
-    return SDL_AndroidGetManifestEnvironmentVariable(name);    
-}
-#elif defined(HAVE_GETENV)
-char *
-SDL_getenv(const char *name)
-{
     /* Input validation */
-    if (!name || SDL_strlen(name)==0) {
+    if (!name || !*name) {
         return NULL;
     }
 
