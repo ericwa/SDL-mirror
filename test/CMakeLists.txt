@@ -6,6 +6,13 @@ project(SDL2 C)
 remove_definitions(-DUSING_GENERATED_CONFIG_H)
 link_libraries(SDL2_test SDL2-static)
 
+# FIXME: Parent directory CMakeLists.txt only sets these for mingw/cygwin,
+# but we need them for VS as well.
+if(WINDOWS)
+    link_libraries(SDL2main)
+    add_definitions(-Dmain=SDL_main)
+endif()
+
 add_executable(checkkeys checkkeys.c)
 add_executable(loopwave loopwave.c)
 add_executable(loopwavequeue loopwavequeue.c)
@@ -90,6 +97,8 @@ file(GLOB RESOURCE_FILES *.bmp *.wav)
 foreach(RESOURCE_FILE ${RESOURCE_FILES})
     add_custom_command(TARGET SDL2_test_resoureces POST_BUILD COMMAND ${CMAKE_COMMAND} ARGS -E copy_if_different ${RESOURCE_FILE} $<TARGET_FILE_DIR:SDL2_test_resoureces>)
 endforeach(RESOURCE_FILE)
+
+file(COPY ${RESOURCE_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 # TODO: Might be easier to make all targets depend on the resources...?
 add_dependencies(testscale SDL2_test_resoureces)
