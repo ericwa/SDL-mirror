@@ -1466,7 +1466,7 @@ Blit_RGB565_32(SDL_BlitInfo * info, const Uint32 * map)
     /* Set up some basic variables */
     width = info->dst_w;
     height = info->dst_h;
-    src = (Uint8 *) info->src;
+    src = info->src;
     srcskip = info->src_skip;
     dst = (Uint32 *) info->dst;
     dstskip = info->dst_skip / 4;
@@ -2317,7 +2317,6 @@ get_permutation(SDL_PixelFormat *srcfmt, SDL_PixelFormat *dstfmt,
     if (_alpha_channel) {
         *_alpha_channel = alpha_channel;
     }
-    return;
 }
 
 
@@ -3109,7 +3108,6 @@ Blit_3or4_to_3or4__same_rgb(SDL_BlitInfo * info)
             dst += dstskip;
         }
     }
-    return;
 }
 
 /* Blit_3or4_to_3or4__inversed_rgb: 3 or 4 bpp, inversed RGB triplet */
@@ -3214,7 +3212,6 @@ Blit_3or4_to_3or4__inversed_rgb(SDL_BlitInfo * info)
             dst += dstskip;
         }
     }
-    return;
 }
 
 /* Normal N to N optimized blitters */
